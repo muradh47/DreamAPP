@@ -125,6 +125,10 @@ jobs:
               }
           }
           """
+          # Python triple-quoted strings turn \\n into actual newlines; Kotlin labels need escaped newlines.
+          t = t.replace('DreamTile("▣\\nLIVE TV"', 'DreamTile("▣\\\\nLIVE TV"')
+          t = t.replace('DreamTile("▶\\nMOVIES"', 'DreamTile("▶\\\\nMOVIES"')
+          t = t.replace('DreamTile("▤\\nSERIES"', 'DreamTile("▤\\\\nSERIES"')
           main.write_text(t)
           PY
           echo "KEYSTORE_PATH=$RUNNER_TEMP/dream.keystore" >> "$GITHUB_ENV"
