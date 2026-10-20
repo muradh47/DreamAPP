@@ -192,14 +192,14 @@ public class MainActivity extends Activity {
         screen("DREAM IPTV");
         root.addView(text("Your entertainment, your way"));
         LinearLayout main = row();
-        addTile(main, "▣\\nLIVE TV", Color.rgb(0, 148, 181), 242, () -> showCategories("live"));
+        addTile(main, "▣\nLIVE TV", Color.rgb(0, 148, 181), 242, () -> showCategories("live"));
         LinearLayout right = new LinearLayout(this);
         right.setOrientation(LinearLayout.VERTICAL);
         main.addView(right, new LinearLayout.LayoutParams(0, -2, 2f));
         LinearLayout top = new LinearLayout(this);
         right.addView(top);
-        addTile(top, "▶\\nMOVIES", Color.rgb(221, 78, 39), 145, () -> showCategories("vod"));
-        addTile(top, "▤\\nSERIES", Color.rgb(112, 77, 187), 145, () -> showCategories("series"));
+        addTile(top, "▶\nMOVIES", Color.rgb(221, 78, 39), 145, () -> showCategories("vod"));
+        addTile(top, "▤\nSERIES", Color.rgb(112, 77, 187), 145, () -> showCategories("series"));
         LinearLayout lower = new LinearLayout(this);
         right.addView(lower);
         addTile(lower, "TV GUIDE", Color.rgb(37, 134, 109), 87, this::showGuide);
