@@ -7,6 +7,8 @@ import android.net.Uri;
 import android.graphics.Color;
 import android.widget.*;
 import android.view.View;
+import android.view.Gravity;
+import android.graphics.drawable.GradientDrawable;
 import androidx.media3.common.MediaItem;
 import androidx.media3.common.PlaybackException;
 import androidx.media3.common.Player;
@@ -27,6 +29,8 @@ public class MainActivity extends Activity {
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
+        getWindow().setStatusBarColor(Color.rgb(10, 15, 31));
+        getWindow().setNavigationBarColor(Color.rgb(10, 15, 31));
         username = getPreferences(0).getString("username", "");
         password = getPreferences(0).getString("password", "");
         if (!username.isEmpty() && !password.isEmpty()) showHome(); else showLogin();
@@ -43,11 +47,11 @@ public class MainActivity extends Activity {
         scroll.setFillViewport(true);
         root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(20, 20, 20, 20);
+        root.setPadding(dp(18), dp(22), dp(18), dp(24));
         root.setBackgroundColor(Color.rgb(13, 18, 30));
         scroll.addView(root); setContentView(scroll);
         TextView heading = text(title);
-        heading.setTextSize(25); root.addView(heading);
+        heading.setTextSize(27); heading.setPadding(dp(8), dp(8), dp(8), dp(18)); root.addView(heading);
     }
 
     private Button button(String title, Runnable action) {
@@ -60,20 +64,27 @@ public class MainActivity extends Activity {
         return b;
     }
 
+    private int dp(int n) { return (int) (n * getResources().getDisplayMetrics().density + 0.5f); }
+
     private Button tile(String title, int color, Runnable action) {
         Button b = new Button(this);
-        b.setText(title); b.setTextSize(20); b.setAllCaps(false);
+        b.setText(title.replace("\\\\n", "\\n")); b.setTextSize(19); b.setAllCaps(false);
+        b.setGravity(Gravity.CENTER); b.setPadding(dp(8), dp(8), dp(8), dp(8));
+        b.setMinHeight(0); b.setMinimumHeight(0);
         b.setTextColor(Color.WHITE); b.setFocusable(true);
-        b.setBackgroundTintList(android.content.res.ColorStateList.valueOf(color));
+        GradientDrawable bg = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[]{color, darken(color)});
+        bg.setCornerRadius(dp(12)); b.setBackground(bg);
         b.setOnClickListener(v -> action.run());
         return b;
     }
 
     private void addTile(LinearLayout row, String title, int color, int height, Runnable action) {
         Button b = tile(title, color, action);
-        LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(0, height, 1f);
-        p.setMargins(7, 7, 7, 7); row.addView(b, p);
+        LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(0, dp(height), 1f);
+        p.setMargins(dp(5), dp(5), dp(5), dp(5)); row.addView(b, p);
     }
+
+    private int darken(int c) { return Color.rgb((int)(Color.red(c)*0.70), (int)(Color.green(c)*0.70), (int)(Color.blue(c)*0.78)); }
 
     private LinearLayout row() {
         LinearLayout r = new LinearLayout(this);
@@ -83,16 +94,22 @@ public class MainActivity extends Activity {
     }
 
     private void showLogin() {
-        screen("DREAM IPTV  •  Sign in");
-        EditText user = new EditText(this);
-        user.setHint("Username"); user.setSingleLine(true);
-        user.setTextColor(Color.WHITE); user.setHintTextColor(Color.LTGRAY); root.addView(user);
-        EditText pass = new EditText(this);
-        pass.setHint("Password"); pass.setSingleLine(true);
-        pass.setInputType(129);
-        pass.setTextColor(Color.WHITE); pass.setHintTextColor(Color.LTGRAY); root.addView(pass);
-        TextView status = text(""); root.addView(status);
-        Button login = button("Log in", () -> {
+        screen("DREAM IPTV");
+        TextView welcome = text("Welcome to Dream IPTV");
+        welcome.setTextSize(26);
+        welcome.setGravity(Gravity.CENTER);
+        root.addView(welcome);
+        TextView subtitle = text("Sign in to enjoy your entertainment");
+        subtitle.setGravity(Gravity.CENTER);
+        subtitle.setTextColor(Color.LTGRAY);
+        root.addView(subtitle);
+
+        EditText user = loginField("Username", false);
+        EditText pass = loginField("Password", true);
+        TextView status = text("");
+        status.setGravity(Gravity.CENTER);
+        root.addView(status);
+        Button login = tile("SIGN IN", Color.rgb(20, 122, 196), () -> {
             String u = user.getText().toString().trim(), p = pass.getText().toString();
             if (u.isEmpty() || p.isEmpty()) { status.setText("Enter username and password"); return; }
             status.setText("Connecting...");
@@ -108,6 +125,31 @@ public class MainActivity extends Activity {
                 } catch (Exception ex) { runOnUiThread(() -> status.setText("Login failed: " + ex.getMessage())); }
             }).start();
         });
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, dp(60));
+        lp.setMargins(dp(12), dp(18), dp(12), dp(12));
+        root.addView(login, lp);
+        TextView note = text("Your server is configured automatically.");
+        note.setGravity(Gravity.CENTER);
+        note.setTextSize(14);
+        note.setTextColor(Color.LTGRAY);
+        root.addView(note);
+    }
+
+    private EditText loginField(String hint, boolean passwordField) {
+        EditText field = new EditText(this);
+        field.setHint(hint); field.setSingleLine(true);
+        if (passwordField) field.setInputType(129);
+        field.setTextColor(Color.WHITE); field.setHintTextColor(Color.LTGRAY);
+        field.setTextSize(18); field.setPadding(dp(18), 0, dp(18), 0);
+        GradientDrawable background = new GradientDrawable();
+        background.setColor(Color.rgb(29, 40, 65));
+        background.setCornerRadius(dp(10));
+        background.setStroke(dp(1), Color.rgb(67, 87, 121));
+        field.setBackground(background);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, dp(62));
+        lp.setMargins(dp(12), dp(10), dp(12), dp(10));
+        root.addView(field, lp);
+        return field;
     }
 
     private void showHome() {
@@ -115,7 +157,7 @@ public class MainActivity extends Activity {
         screen("DREAM IPTV");
         root.addView(text("Your entertainment, your way"));
         LinearLayout main = row();
-        addTile(main, "▣\\nLIVE TV", Color.rgb(0, 148, 181), 230, () -> showCategories("live"));
+        addTile(main, "▣\\nLIVE TV", Color.rgb(0, 148, 181), 242, () -> showCategories("live"));
         LinearLayout right = new LinearLayout(this);
         right.setOrientation(LinearLayout.VERTICAL);
         main.addView(right, new LinearLayout.LayoutParams(0, -2, 2f));
@@ -125,11 +167,11 @@ public class MainActivity extends Activity {
         addTile(top, "▤\\nSERIES", Color.rgb(112, 77, 187), 145, () -> showCategories("series"));
         LinearLayout lower = new LinearLayout(this);
         right.addView(lower);
-        addTile(lower, "TV GUIDE", Color.rgb(37, 134, 109), 73, this::showGuide);
-        addTile(lower, "CATCH UP", Color.rgb(36, 120, 97), 73, () -> showCategories("live"));
+        addTile(lower, "TV GUIDE", Color.rgb(37, 134, 109), 87, this::showGuide);
+        addTile(lower, "CATCH UP", Color.rgb(36, 120, 97), 87, () -> showCategories("live"));
         LinearLayout tools = row();
-        addTile(tools, "CHECK UPDATES", Color.rgb(38, 57, 89), 72, this::checkUpdates);
-        addTile(tools, "LOG OUT", Color.rgb(38, 57, 89), 72, () -> {
+        addTile(tools, "CHECK UPDATES", Color.rgb(38, 57, 89), 88, this::checkUpdates);
+        addTile(tools, "LOG OUT", Color.rgb(38, 57, 89), 88, () -> {
             getPreferences(0).edit().clear().apply();
             username = ""; password = ""; showLogin();
         });
