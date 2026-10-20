@@ -121,14 +121,17 @@ public class MainActivity extends Activity {
 
         EditText user = loginField("Username", false);
         android.content.SharedPreferences prefs = getPreferences(0);
-        boolean rememberEnabled = prefs.getBoolean("remember_username", false);
-        if (rememberEnabled) user.setText(prefs.getString("saved_username", ""));
+        boolean rememberEnabled = prefs.getBoolean("remember_login", false);
+        if (rememberEnabled) {
+            user.setText(prefs.getString("saved_username", ""));
+        }
         CheckBox remember = new CheckBox(this);
-        remember.setText("Remember username");
+        remember.setText("Remember username and password");
         remember.setTextColor(Color.WHITE);
         remember.setChecked(rememberEnabled);
         root.addView(remember);
         EditText pass = loginField("Password", true);
+        if (rememberEnabled) pass.setText(prefs.getString("saved_password", ""));
         TextView status = text("");
         status.setGravity(Gravity.CENTER);
         root.addView(status);
@@ -146,9 +149,9 @@ public class MainActivity extends Activity {
                     boolean saveUsername = remember.isChecked();
                     android.content.SharedPreferences.Editor editor = getPreferences(0).edit()
                         .putString("username", u).putString("password", p)
-                        .putBoolean("remember_username", saveUsername);
-                    if (saveUsername) editor.putString("saved_username", u);
-                    else editor.remove("saved_username");
+                        .putBoolean("remember_login", saveUsername);
+                    if (saveUsername) editor.putString("saved_username", u).putString("saved_password", p);
+                    else editor.remove("saved_username").remove("saved_password");
                     editor.apply();
                     runOnUiThread(this::showHome);
                 } catch (Exception ex) { runOnUiThread(() -> status.setText("Login failed: " + ex.getMessage())); }
@@ -679,7 +682,8 @@ public class MainActivity extends Activity {
             request.setTitle("Dream IPTV update");
             request.setDescription("Downloading new version");
             request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
-            request.setDestinationInExternalFilesDir(this, android.os.Environment.DIRECTORY_DOWNLOADS, "dream-iptv-update.apk");
+            final String downloadPath = "dream-iptv-update-" + System.currentTimeMillis() + ".apk";
+            request.setDestinationInExternalFilesDir(this, android.os.Environment.DIRECTORY_DOWNLOADS, downloadPath);
             updateDownloadId = manager.enqueue(request);
             status.setText("Downloading update...");
             if (updateReceiver != null) unregisterReceiver(updateReceiver);
@@ -692,10 +696,10 @@ public class MainActivity extends Activity {
                         int state = cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS));
                         if (state != DownloadManager.STATUS_SUCCESSFUL) { status.setText("Update download failed"); return; }
                     }
-                    status.setText("Download complete. Confirm installation in Android.");
+                    status.setText("Download complete. Opening Android installer...");
                     Uri apk = androidx.core.content.FileProvider.getUriForFile(
                         MainActivity.this, getPackageName() + ".fileprovider",
-                        new java.io.File(getExternalFilesDir(android.os.Environment.DIRECTORY_DOWNLOADS), "dream-iptv-update.apk"));
+                        new java.io.File(getExternalFilesDir(android.os.Environment.DIRECTORY_DOWNLOADS), downloadPath));
                     Intent install = new Intent(Intent.ACTION_VIEW);
                     install.setDataAndType(apk, "application/vnd.android.package-archive");
                     install.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
@@ -704,7 +708,7 @@ public class MainActivity extends Activity {
                 }
             };
             IntentFilter filter = new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE);
-            if (Build.VERSION.SDK_INT >= 33) registerReceiver(updateReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+            if (Build.VERSION.SDK_INT >= 33) registerReceiver(updateReceiver, filter, Context.RECEIVER_EXPORTED);
             else registerReceiver(updateReceiver, filter);
         } catch (Exception e) { status.setText("Download failed: " + e.getMessage()); }
     }
