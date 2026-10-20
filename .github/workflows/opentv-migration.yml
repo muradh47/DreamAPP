@@ -16,7 +16,8 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - uses: android-actions/setup-android@v3
+      - name: Verify preinstalled Android SDK
+        run: test -d "$ANDROID_HOME/platforms/android-35" && test -d "$ANDROID_HOME/build-tools" 
       - name: Configure Dream IPTV candidate
         env:
           KEYSTORE_BASE64: ${{ secrets.APK_KEYSTORE_BASE64 }}
