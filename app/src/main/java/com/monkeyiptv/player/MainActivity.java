@@ -6,6 +6,9 @@ import android.content.Intent;
 import android.net.Uri;
 import android.graphics.Color;
 import android.widget.*;
+import android.graphics.BitmapFactory;
+import android.graphics.Bitmap;
+import android.graphics.Typeface;
 import android.view.View;
 import android.view.Gravity;
 import android.graphics.drawable.GradientDrawable;
@@ -260,33 +263,82 @@ public class MainActivity extends Activity {
             + (action.isEmpty() ? "" : "&action=" + action);
     }
 
+    private LinearLayout categorySidebar;
+    private GridLayout contentGrid;
+    private TextView browserHeading;
+    private int browseRequest = 0;
+
+    private void browserShell(String type) {
+        LinearLayout page = new LinearLayout(this);
+        page.setOrientation(LinearLayout.VERTICAL);
+        page.setBackgroundColor(Color.rgb(11, 16, 35));
+        setContentView(page);
+        LinearLayout header = new LinearLayout(this);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        header.setPadding(dp(12), dp(8), dp(12), dp(8));
+        page.addView(header, new LinearLayout.LayoutParams(-1, dp(68)));
+        Button back = tile("‹ HOME", Color.rgb(34, 47, 76), this::showHome);
+        header.addView(back, new LinearLayout.LayoutParams(dp(115), dp(50)));
+        browserHeading = text(type.equals("live") ? "LIVE TV" : type.equals("vod") ? "MOVIES" : "SERIES");
+        browserHeading.setTextSize(23);
+        header.addView(browserHeading, new LinearLayout.LayoutParams(0, -2, 1));
+        TextView clock = text(new java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(new java.util.Date()));
+        header.addView(clock);
+
+        LinearLayout body = new LinearLayout(this);
+        page.addView(body, new LinearLayout.LayoutParams(-1, 0, 1));
+        ScrollView left = new ScrollView(this);
+        left.setBackgroundColor(Color.rgb(22, 31, 56));
+        body.addView(left, new LinearLayout.LayoutParams(dp(210), -1));
+        categorySidebar = new LinearLayout(this);
+        categorySidebar.setOrientation(LinearLayout.VERTICAL);
+        left.addView(categorySidebar);
+
+        ScrollView right = new ScrollView(this);
+        body.addView(right, new LinearLayout.LayoutParams(0, -1, 1));
+        contentGrid = new GridLayout(this);
+        contentGrid.setColumnCount(3);
+        contentGrid.setPadding(dp(8), dp(8), dp(8), dp(8));
+        right.addView(contentGrid);
+    }
+
+    private void sidebarItem(String title, boolean selected, Runnable action) {
+        Button item = tile(title, selected ? Color.rgb(23, 110, 185) : Color.rgb(29, 39, 65), action);
+        item.setTextSize(15);
+        item.setGravity(Gravity.CENTER_VERTICAL | Gravity.LEFT);
+        LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(-1, dp(60));
+        p.setMargins(dp(3), dp(3), dp(3), dp(3));
+        categorySidebar.addView(item, p);
+    }
+
     private void showCategories(String type) {
         currentType = type;
-        screen("Loading categories...");
+        browserShell(type);
+        sidebarItem("Loading categories...", true, () -> {});
         new Thread(() -> {
             try {
                 String action = type.equals("live") ? "get_live_categories" :
                     type.equals("vod") ? "get_vod_categories" : "get_series_categories";
                 JSONArray categories = new JSONArray(fetch(api(username, password, action)));
                 runOnUiThread(() -> {
-                    screen(type.equals("live") ? "Live TV" : type.equals("vod") ? "Movies" : "Series");
-                    button("← Home", this::showHome);
-                    button("All", () -> showItems(type, ""));
+                    categorySidebar.removeAllViews();
+                    sidebarItem("ALL", true, () -> showItems(type, ""));
                     for (int i = 0; i < categories.length(); i++) {
-                        JSONObject category = categories.optJSONObject(i);
-                        if (category == null) continue;
-                        String id = category.optString("category_id");
-                        String name = category.optString("category_name", "Other");
-                        button(name, () -> showItems(type, id));
+                        JSONObject c = categories.optJSONObject(i);
+                        if (c == null) continue;
+                        String id = c.optString("category_id");
+                        String name = c.optString("category_name", "Other");
+                        sidebarItem(name, false, () -> showItems(type, id));
                     }
-                    if (categories.length() == 0) root.addView(text("No categories returned by provider. Try All."));
+                    showItems(type, "");
                 });
-            } catch (Exception e) {
+            } catch (Exception ex) {
                 runOnUiThread(() -> {
-                    screen("Categories unavailable");
-                    button("← Home", this::showHome);
-                    root.addView(text(e.getMessage()));
-                    button("Show all items", () -> showItems(type, ""));
+                    categorySidebar.removeAllViews();
+                    sidebarItem("ALL", true, () -> showItems(type, ""));
+                    contentGrid.removeAllViews();
+                    contentGrid.addView(text("Category loading failed: " + ex.getMessage()));
+                    showItems(type, "");
                 });
             }
         }).start();
@@ -295,7 +347,15 @@ public class MainActivity extends Activity {
     private void showItems(String type, String categoryId) {
         currentType = type;
         currentCategory = categoryId;
-        screen("Loading...");
+        int requestId = ++browseRequest;
+        if (contentGrid == null || categorySidebar == null) { showCategories(type); return; }
+        browserHeading.setText(type.equals("live") ? "LIVE TV" : type.equals("vod") ? "MOVIES" : "SERIES");
+        contentGrid.removeAllViews();
+        contentGrid.addView(text("Loading channels and posters..."));
+        for (int i = 0; i < categorySidebar.getChildCount(); i++) {
+            View v = categorySidebar.getChildAt(i);
+            if (v instanceof Button) v.setAlpha(0.85f);
+        }
         new Thread(() -> {
             try {
                 String action = type.equals("live") ? "get_live_streams" :
@@ -304,31 +364,67 @@ public class MainActivity extends Activity {
                 if (!categoryId.isEmpty()) request += "&category_id=" + enc(categoryId);
                 JSONArray items = new JSONArray(fetch(request));
                 runOnUiThread(() -> {
-                    screen(type.equals("live") ? "Live channels" : type.equals("vod") ? "Movies" : "Series");
-                    button("← Categories", () -> showCategories(type));
-                    root.addView(text(type.equals("live") ? "Select a channel to view programmes and watch" : type.equals("vod") ? "Select a movie to play" : "Select a series to browse seasons"));
+                    if (requestId != browseRequest || contentGrid == null) return;
+                    contentGrid.removeAllViews();
+                    if (items.length() == 0) contentGrid.addView(text("No content in this category"));
                     for (int i = 0; i < items.length(); i++) {
                         JSONObject item = items.optJSONObject(i);
                         if (item == null) continue;
                         String id = item.optString(type.equals("series") ? "series_id" : "stream_id");
                         if (id.isEmpty()) continue;
                         String name = item.optString("name", "Untitled");
-                        button(name, () -> {
-                            if (type.equals("series")) showEpisodes(id, name);
-                            else if (type.equals("live")) showChannel(id, name);
-                            else play(type, id, item.optString("container_extension", "mp4"));
-                        });
+                        String logo = item.optString(type.equals("live") ? "stream_icon" : "cover", "");
+                        String ext = item.optString("container_extension", "mp4");
+                        channelCard(name, logo, type, id, ext);
                     }
-                    if (items.length() == 0) root.addView(text("No items in this category."));
                 });
-            } catch (Exception e) {
+            } catch (Exception ex) {
                 runOnUiThread(() -> {
-                    screen("Unable to load content");
-                    button("← Categories", () -> showCategories(type));
-                    root.addView(text(e.getMessage()));
+                    if (requestId != browseRequest || contentGrid == null) return;
+                    contentGrid.removeAllViews();
+                    contentGrid.addView(text("Unable to load: " + ex.getMessage()));
                 });
             }
         }).start();
+    }
+
+    private void channelCard(String name, String logo, String type, String id, String ext) {
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setBackgroundColor(Color.rgb(29, 36, 52));
+        card.setFocusable(true);
+        card.setOnClickListener(v -> {
+            if (type.equals("live")) showChannel(id, name);
+            else if (type.equals("series")) showEpisodes(id, name);
+            else play(type, id, ext);
+        });
+        card.setOnFocusChangeListener((v, focused) -> card.setBackgroundColor(
+            focused ? Color.rgb(33, 107, 187) : Color.rgb(29, 36, 52)));
+        ImageView image = new ImageView(this);
+        image.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        image.setPadding(dp(8), dp(8), dp(8), dp(8));
+        card.addView(image, new LinearLayout.LayoutParams(-1, dp(105)));
+        TextView label = text(name);
+        label.setTextSize(14);
+        label.setMaxLines(2);
+        label.setGravity(Gravity.CENTER);
+        card.addView(label, new LinearLayout.LayoutParams(-1, dp(56)));
+        GridLayout.LayoutParams gp = new GridLayout.LayoutParams();
+        gp.width = dp(155); gp.height = dp(170);
+        gp.setMargins(dp(6), dp(6), dp(6), dp(6));
+        contentGrid.addView(card, gp);
+        if (logo.startsWith("https://") || logo.startsWith("http://")) {
+            new Thread(() -> {
+                try {
+                    HttpURLConnection conn = (HttpURLConnection) new URL(logo).openConnection();
+                    conn.setConnectTimeout(4500); conn.setReadTimeout(4500);
+                    Bitmap bmp;
+                    try (InputStream in = conn.getInputStream()) { bmp = BitmapFactory.decodeStream(in); }
+                    finally { conn.disconnect(); }
+                    if (bmp != null) runOnUiThread(() -> image.setImageBitmap(bmp));
+                } catch (Exception ignored) {}
+            }).start();
+        }
     }
 
     private void showEpisodes(String seriesId, String name) {
