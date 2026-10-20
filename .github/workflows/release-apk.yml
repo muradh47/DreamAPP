@@ -130,6 +130,23 @@ jobs:
           t = t.replace('DreamTile("▶\\nMOVIES"', 'DreamTile("▶\\\\nMOVIES"')
           t = t.replace('DreamTile("▤\\nSERIES"', 'DreamTile("▤\\\\nSERIES"')
           main.write_text(t)
+          # Redesign provider setup: Dream IPTV login instead of OpenTV onboarding.
+          onboarding_code = onboarding.read_text()
+          onboarding_code = onboarding_code.replace('var name by remember(existing?.id) { mutableStateOf(existing?.name ?: "") }', 'var name by remember(existing?.id) { mutableStateOf("Dream IPTV") }')
+          onboarding_code = onboarding_code.replace('        name = name.ifBlank {', '        name = "Dream IPTV".ifBlank {')
+          onboarding_code = onboarding_code.replace('                stringResource(\n                    if (existing != null) R.string.settings_edit_provider_title\n                    else R.string.onboarding_add_provider_title,\n                ),', '                "DREAM IPTV",')
+          onboarding_code = onboarding_code.replace('                stringResource(R.string.onboarding_add_provider_desc),', '                "Welcome back. Sign in to start watching.",')
+          onboarding_code = onboarding_code.replace('Text("Dream IPTV · Secure login", style = MaterialTheme.typography.titleMedium)', 'Text("YOUR ACCOUNT", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)')
+          onboarding_code = onboarding_code.replace('Text(stringResource(R.string.onboarding_privacy_note),', 'Text("Your login is saved on this device. Connect securely to your IPTV provider.",')
+          onboarding_code = onboarding_code.replace('Text(stringResource(R.string.onboarding_save_load))', 'Text("SIGN IN")')
+          onboarding_code = onboarding_code.replace('else stringResource(R.string.onboarding_save_load)', 'else "SIGN IN"')
+          onboarding_code = onboarding_code.replace('            .padding(32.dp),', '            .padding(horizontal = 32.dp, vertical = 20.dp),')
+          onboarding_code = onboarding_code.replace('Column(Modifier.widthIn(max = 640.dp))', 'Column(Modifier.widthIn(max = 560.dp))')
+          onboarding.write_text(onboarding_code)
+          # Login must remain dark even when the phone's system theme is light.
+          main_code = main.read_text()
+          main_code = main_code.replace('OpenTvTheme(darkTheme = darkTheme)', 'OpenTvTheme(darkTheme = true)')
+          main.write_text(main_code)
           # Connect Dream home tiles to their actual OpenTV content tabs.
           main_code = main.read_text()
           main_code = main_code.replace('const val BROWSE = "browse"', 'const val BROWSE = "browse/{section}"')
