@@ -250,22 +250,31 @@ public class MainActivity extends Activity {
     private void showFullscreenLive(String id, String channel, boolean fromGuide) {
         releasePlayer();
         setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
-        getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
-        screen(channel);
-        button("← BACK TO GUIDE", () -> {
-            releasePlayer();
-            setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
-            getWindow().getDecorView().setSystemUiVisibility(0);
-            showGuide();
-        });
+        getWindow().getDecorView().setSystemUiVisibility(
+            View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION |
+            View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY | View.SYSTEM_UI_FLAG_LAYOUT_STABLE |
+            View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION);
+        android.widget.FrameLayout fullscreen = new android.widget.FrameLayout(this);
+        fullscreen.setBackgroundColor(Color.BLACK);
+        setContentView(fullscreen);
         PlayerView fullscreenView = new PlayerView(this);
         fullscreenView.setUseController(true);
         fullscreenView.setControllerShowTimeoutMs(3500);
-        root.addView(fullscreenView, new LinearLayout.LayoutParams(-1, dp(320)));
+        fullscreenView.setResizeMode(androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT);
+        fullscreen.addView(fullscreenView, new android.widget.FrameLayout.LayoutParams(-1, -1));
+        Button back = new Button(this);
+        back.setText("← GUIDE");
+        android.widget.FrameLayout.LayoutParams backParams = new android.widget.FrameLayout.LayoutParams(
+            dp(130), dp(48), Gravity.TOP | Gravity.START);
+        backParams.setMargins(dp(12), dp(12), 0, 0);
+        fullscreen.addView(back, backParams);
+        back.setOnClickListener(v -> {
+            releasePlayer();
+            setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
+            getWindow().getDecorView().setSystemUiVisibility(0);
+            if (fromGuide) showGuide(); else showCategories("live");
+        });
         startStream("live", id, "ts", fullscreenView);
-        TextView fullscreenStatus = text("Connecting to channel...");
-        root.addView(fullscreenStatus);
-        attachPlaybackStatus(fullscreenStatus, id);
     }
 
     private void showEpgInline(String id, String channel, boolean fromGuide) {
