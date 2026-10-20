@@ -776,9 +776,11 @@ public class MainActivity extends Activity {
                     Uri apk = androidx.core.content.FileProvider.getUriForFile(
                         MainActivity.this, getPackageName() + ".fileprovider",
                         new java.io.File(getExternalFilesDir(android.os.Environment.DIRECTORY_DOWNLOADS), downloadPath));
-                    Intent install = new Intent(Intent.ACTION_VIEW);
-                    install.setDataAndType(apk, "application/vnd.android.package-archive");
-                    install.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
+                    Intent install = new Intent(Intent.ACTION_INSTALL_PACKAGE);
+                    install.setData(apk);
+                    install.setClipData(android.content.ClipData.newRawUri("Dream IPTV update", apk));
+                    install.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                    install.putExtra(Intent.EXTRA_RETURN_RESULT, true);
                     try {
                         if (Build.VERSION.SDK_INT >= 26 && !getPackageManager().canRequestPackageInstalls()) {
                             status.setText("Allow Dream IPTV to install updates, then tap INSTALL DOWNLOADED UPDATE.");
