@@ -130,6 +130,17 @@ jobs:
           t = t.replace('DreamTile("▶\\nMOVIES"', 'DreamTile("▶\\\\nMOVIES"')
           t = t.replace('DreamTile("▤\\nSERIES"', 'DreamTile("▤\\\\nSERIES"')
           main.write_text(t)
+          # Point both automatic and manual updates at Dream IPTV releases, never OpenTV.
+          checker = Path("app/src/main/java/app/opentv/update/UpdateChecker.kt")
+          update_code = checker.read_text()
+          if 'const val REPO_SLUG = "opentvproject/opentv"' not in update_code:
+              raise RuntimeError("Upstream update source changed; refusing to ship OpenTV updater")
+          update_code = update_code.replace('const val REPO_SLUG = "opentvproject/opentv"', 'const val REPO_SLUG = "muradh47/MonkeyIPTV"')
+          update_code = update_code.replace('.header("User-Agent", "OpenTV")', '.header("User-Agent", "DreamIPTV")')
+          checker.write_text(update_code)
+          about = Path("app/src/main/java/app/opentv/ui/settings/AboutScreen.kt")
+          about_code = about.read_text().replace('Text("OpenTV ${BuildConfig.VERSION_NAME}"', 'Text("Dream IPTV ${BuildConfig.VERSION_NAME}"')
+          about.write_text(about_code)
           # Dream IPTV visual system applied across all OpenTV screens.
           theme = Path("app/src/main/java/app/opentv/ui/theme/Theme.kt")
           palette = theme.read_text()
