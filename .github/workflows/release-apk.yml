@@ -1,4 +1,4 @@
-name: Publish continuous beta APK
+name: Publish Dream IPTV OpenTV beta
 on:
   push:
     branches: [master]
@@ -9,53 +9,137 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out GPL OpenTV upstream
+        uses: actions/checkout@v4
+        with:
+          repository: opentvproject/opentv
+          ref: main
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
-      - uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.11.1'
-      - name: Configure version and signing
+      - name: Verify preinstalled Android SDK
+        run: test -d "$ANDROID_HOME/platforms/android-35" && test -d "$ANDROID_HOME/build-tools" 
+      - name: Configure Dream IPTV candidate
         env:
           KEYSTORE_BASE64: ${{ secrets.APK_KEYSTORE_BASE64 }}
           STORE_PASSWORD: ${{ secrets.APK_STORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.APK_KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.APK_KEY_PASSWORD }}
+        shell: bash
         run: |
-          test -n "$KEYSTORE_BASE64" && test -n "$STORE_PASSWORD" && test -n "$KEY_ALIAS" && test -n "$KEY_PASSWORD" || { echo "Configure APK signing secrets"; exit 1; }
-          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.keystore"
-          VERSION="0.1.${GITHUB_RUN_NUMBER}"
-          echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'
-          VERSION_CODE=$(echo "$VERSION" | awk -F. '{print $1*1000000+$2*1000+$3}')
-          sed -i "s/versionCode = 1/versionCode = $VERSION_CODE/; s/versionName = \"0.1.0\"/versionName = \"$VERSION\"/" app/build.gradle.kts
-          cat >> app/build.gradle.kts <<'EOF'
-
-          android {
-              signingConfigs {
-                  create("releaseSigning") {
-                      storeFile = file(System.getenv("RUNNER_TEMP") + "/release.keystore")
-                      storePassword = System.getenv("APK_STORE_PASSWORD")
-                      keyAlias = System.getenv("APK_KEY_ALIAS")
-                      keyPassword = System.getenv("APK_KEY_PASSWORD")
+          set -euo pipefail
+          test -n "$KEYSTORE_BASE64" && test -n "$STORE_PASSWORD" && test -n "$KEY_ALIAS" && test -n "$KEY_PASSWORD"
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/dream.keystore"
+          python3 - <<'PY'
+          from pathlib import Path
+          import os
+          p = Path("app/build.gradle.kts")
+          s = p.read_text()
+          s = s.replace('applicationId = "app.opentv"', 'applicationId = "com.monkeyiptv.player"')
+          s = s.replace('versionCode = 20', 'versionCode = ' + str(2000000 + int(os.environ["GITHUB_RUN_NUMBER"])))
+          s = s.replace('versionName = "0.11.8"', 'versionName = "0.2.' + os.environ["GITHUB_RUN_NUMBER"] + '"')
+          p.write_text(s)
+          manifest = Path("app/src/main/AndroidManifest.xml")
+          t = manifest.read_text().replace('android:screenOrientation="fullUser"', 'android:screenOrientation="landscape"')
+          manifest.write_text(t)
+          for strings in Path("app/src/main/res").glob("values*/strings.xml"):
+              text = strings.read_text()
+              text = text.replace('>OpenTV</string>', '>Dream IPTV</string>')
+              strings.write_text(text)
+          # Brand the OpenTV setup as a username/password-only Xtream login.
+          onboarding = Path("app/src/main/java/app/opentv/ui/onboarding/AddSourceScreen.kt")
+          t = onboarding.read_text()
+          t = t.replace('var usePhone by remember { mutableStateOf(isTelevision && editingSourceId == null) }', 'var usePhone by remember { mutableStateOf(false) }')
+          t = t.replace('var kind by remember(existing?.id) { mutableStateOf(existing?.kind ?: SourceKind.XTREAM) }', 'var kind by remember(existing?.id) { mutableStateOf(SourceKind.XTREAM) }')
+          t = t.replace('var url by remember(existing?.id) { mutableStateOf(existing?.url ?: "") }', 'var url by remember(existing?.id) { mutableStateOf("http://tvplug.xyz:8880") }')
+          start = t.index('            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {')
+          end = t.index('            if (kind == SourceKind.XTREAM) {', start)
+          t = t[:start] + '            Text("Dream IPTV · Secure login", style = MaterialTheme.typography.titleMedium)\n            Spacer(Modifier.height(20.dp))\n\n' + t[end:]
+          t = t.replace('url = url,', 'url = "http://tvplug.xyz:8880",')
+          onboarding.write_text(t)
+          # Preserve the original Dream IPTV home tile layout; OpenTV owns the other screens.
+          main = Path("app/src/main/java/app/opentv/MainActivity.kt")
+          t = main.read_text()
+          t = t.replace('    const val HOME = "home"', '    const val HOME = "home"\n    const val BROWSE = "browse"')
+          marker = '            composable(Routes.HOME) {\n                MainScreen('
+          if marker not in t:
+              raise RuntimeError("OpenTV navigation layout changed")
+          t = t.replace(marker, '''            composable(Routes.HOME) {
+                DreamHomeScreen(
+                    onBrowse = { navController.navigate(Routes.BROWSE) },
+                    onGuide = { navController.navigate(Routes.BROWSE) },
+                    onUpdates = { navController.navigate(Routes.ABOUT) },
+                    onLogout = { navController.navigate(Routes.PROVIDERS) },
+                )
+            }
+            composable(Routes.BROWSE) {
+                MainScreen(''', 1)
+          t += r"""
+          @Composable
+          private fun DreamHomeScreen(
+              onBrowse: () -> Unit,
+              onGuide: () -> Unit,
+              onUpdates: () -> Unit,
+              onLogout: () -> Unit,
+          ) {
+              androidx.compose.foundation.layout.Column(
+                  modifier = Modifier.fillMaxSize().background(Color(0xFF101827)).padding(20.dp),
+              ) {
+                  Text("DREAM IPTV", style = MaterialTheme.typography.headlineMedium, color = Color.White)
+                  Text("Your entertainment, your way", color = Color.LightGray)
+                  Spacer(Modifier.size(16.dp))
+                  Row(Modifier.weight(1f)) {
+            DreamTile("▣\nLIVE TV", Color(0xFF0094B5), Modifier.weight(1f).fillMaxSize(), onBrowse)
+            androidx.compose.foundation.layout.Column(Modifier.weight(2f)) {
+                Row(Modifier.weight(1f)) {
+                    DreamTile("▶\nMOVIES", Color(0xFFDD4E27), Modifier.weight(1f).fillMaxSize(), onBrowse)
+                    DreamTile("▤\nSERIES", Color(0xFF704DBB), Modifier.weight(1f).fillMaxSize(), onBrowse)
+                }
+                Row(Modifier.weight(0.6f)) {
+                    DreamTile("TV GUIDE", Color(0xFF25866D), Modifier.weight(1f).fillMaxSize(), onGuide)
+                    DreamTile("CATCH UP", Color(0xFF247861), Modifier.weight(1f).fillMaxSize(), onBrowse)
+                }
+            }
                   }
-              }
-              buildTypes {
-                  getByName("release") {
-                      isMinifyEnabled = false
-                      signingConfig = signingConfigs.getByName("releaseSigning")
+                  Row(Modifier.fillMaxSize().weight(0.28f)) {
+            DreamTile("CHECK UPDATES", Color(0xFF263959), Modifier.weight(1f).fillMaxSize(), onUpdates)
+            DreamTile("LOG OUT", Color(0xFF263959), Modifier.weight(1f).fillMaxSize(), onLogout)
                   }
               }
           }
-          EOF
-          echo "APK_STORE_PASSWORD=$STORE_PASSWORD" >> "$GITHUB_ENV"
-          echo "APK_KEY_ALIAS=$KEY_ALIAS" >> "$GITHUB_ENV"
-          echo "APK_KEY_PASSWORD=$KEY_PASSWORD" >> "$GITHUB_ENV"
-          echo "BETA_TAG=v$VERSION" >> "$GITHUB_ENV"
-      - name: Build release APK
-        run: gradle :app:assembleRelease --no-daemon
-      - name: Publish GitHub release
+
+          @Composable
+          private fun DreamTile(
+              label: String,
+              color: Color,
+              modifier: Modifier,
+              onClick: () -> Unit,
+          ) {
+              Box(
+                  modifier = modifier.padding(4.dp).clip(RoundedCornerShape(12.dp))
+            .background(color).clickable(onClick = onClick),
+                  contentAlignment = Alignment.Center,
+              ) {
+                  Text(label, color = Color.White, style = MaterialTheme.typography.titleLarge)
+              }
+          }
+          """
+          # Python triple-quoted strings turn \\n into actual newlines; Kotlin labels need escaped newlines.
+          t = t.replace('DreamTile("▣\\nLIVE TV"', 'DreamTile("▣\\\\nLIVE TV"')
+          t = t.replace('DreamTile("▶\\nMOVIES"', 'DreamTile("▶\\\\nMOVIES"')
+          t = t.replace('DreamTile("▤\\nSERIES"', 'DreamTile("▤\\\\nSERIES"')
+          main.write_text(t)
+          PY
+          echo "KEYSTORE_PATH=$RUNNER_TEMP/dream.keystore" >> "$GITHUB_ENV"
+          echo "KEYSTORE_PASSWORD=$STORE_PASSWORD" >> "$GITHUB_ENV"
+          echo "KEY_ALIAS=$KEY_ALIAS" >> "$GITHUB_ENV"
+          echo "KEY_PASSWORD=$KEY_PASSWORD" >> "$GITHUB_ENV"
+      - name: Compile signed migration candidate
+        run: chmod +x ./gradlew && ./gradlew :app:assembleRelease --no-daemon
+      - name: Publish OpenTV Dream IPTV beta release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$BETA_TAG" app/build/outputs/apk/release/*.apk --target "$GITHUB_SHA" --title "MonkeyIPTV Beta $BETA_TAG" --notes "Automatic beta build from master." --latest
+        run: |
+          VERSION="0.2.${GITHUB_RUN_NUMBER}"
+          gh release create "v${VERSION}" app/build/outputs/apk/release/*.apk --repo "${GITHUB_REPOSITORY}" --target "${GITHUB_SHA}" --title "Dream IPTV OpenTV Beta v${VERSION}" --notes "OpenTV-based Dream IPTV beta built from master. GPL-3.0-or-later upstream opentvproject/opentv." --latest
