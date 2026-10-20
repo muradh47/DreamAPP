@@ -1,13 +1,13 @@
-name: Validate OpenTV migration base
+name: Build Dream IPTV OpenTV migration candidate
 on:
   workflow_dispatch:
 permissions:
   contents: read
 jobs:
-  upstream-build:
+  candidate:
     runs-on: ubuntu-latest
     steps:
-      - name: Check out OpenTV source
+      - name: Check out GPL OpenTV upstream
         uses: actions/checkout@v4
         with:
           repository: opentvproject/opentv
@@ -17,10 +17,43 @@ jobs:
           distribution: temurin
           java-version: '17'
       - uses: android-actions/setup-android@v3
-      - name: Build upstream baseline (not a Dream IPTV release)
-        run: chmod +x ./gradlew && ./gradlew :app:assembleDebug --no-daemon
-      - uses: actions/upload-artifact@v4
+      - name: Configure Dream IPTV candidate
+        env:
+          KEYSTORE_BASE64: ${{ secrets.APK_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.APK_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.APK_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.APK_KEY_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$KEYSTORE_BASE64" && test -n "$STORE_PASSWORD" && test -n "$KEY_ALIAS" && test -n "$KEY_PASSWORD"
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/dream.keystore"
+          python3 - <<'PY'
+          from pathlib import Path
+          import os
+          p = Path("app/build.gradle.kts")
+          s = p.read_text()
+          s = s.replace('applicationId = "app.opentv"', 'applicationId = "com.monkeyiptv.player"')
+          s = s.replace('versionCode = 20', 'versionCode = ' + str(100000 + int(os.environ["GITHUB_RUN_NUMBER"])))
+          s = s.replace('versionName = "0.11.8"', 'versionName = "0.2.' + os.environ["GITHUB_RUN_NUMBER"] + '"')
+          p.write_text(s)
+          manifest = Path("app/src/main/AndroidManifest.xml")
+          t = manifest.read_text().replace('android:screenOrientation="fullUser"', 'android:screenOrientation="landscape"')
+          manifest.write_text(t)
+          for strings in Path("app/src/main/res").glob("values*/strings.xml"):
+              text = strings.read_text()
+              text = text.replace('>OpenTV</string>', '>Dream IPTV</string>')
+              strings.write_text(text)
+          PY
+          echo "KEYSTORE_PATH=$RUNNER_TEMP/dream.keystore" >> "$GITHUB_ENV"
+          echo "KEYSTORE_PASSWORD=$STORE_PASSWORD" >> "$GITHUB_ENV"
+          echo "KEY_ALIAS=$KEY_ALIAS" >> "$GITHUB_ENV"
+          echo "KEY_PASSWORD=$KEY_PASSWORD" >> "$GITHUB_ENV"
+      - name: Compile signed migration candidate
+        run: chmod +x ./gradlew && ./gradlew :app:assembleRelease --no-daemon
+      - name: Upload candidate for review (not a public beta release)
+        uses: actions/upload-artifact@v4
         with:
-          name: opentv-upstream-debug-baseline
-          path: app/build/outputs/apk/debug/*.apk
+          name: dream-iptv-opentv-migration-candidate
+          path: app/build/outputs/apk/release/*.apk
           if-no-files-found: error
