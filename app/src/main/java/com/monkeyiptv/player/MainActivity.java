@@ -267,6 +267,10 @@ public class MainActivity extends Activity {
     private GridLayout contentGrid;
     private TextView browserHeading;
     private int browseRequest = 0;
+    private static final int PAGE_SIZE = 45;
+    private JSONArray currentItems;
+    private int nextItemIndex = 0;
+    private String currentBrowseType = "live";
 
     private void browserShell(String type) {
         LinearLayout page = new LinearLayout(this);
@@ -348,6 +352,8 @@ public class MainActivity extends Activity {
         currentType = type;
         currentCategory = categoryId;
         int requestId = ++browseRequest;
+        currentItems = null;
+        loadMoreButton = null;
         if (contentGrid == null || categorySidebar == null) { showCategories(type); return; }
         browserHeading.setText(type.equals("live") ? "LIVE TV" : type.equals("vod") ? "MOVIES" : "SERIES");
         contentGrid.removeAllViews();
@@ -367,16 +373,11 @@ public class MainActivity extends Activity {
                     if (requestId != browseRequest || contentGrid == null) return;
                     contentGrid.removeAllViews();
                     if (items.length() == 0) contentGrid.addView(text("No content in this category"));
-                    for (int i = 0; i < items.length(); i++) {
-                        JSONObject item = items.optJSONObject(i);
-                        if (item == null) continue;
-                        String id = item.optString(type.equals("series") ? "series_id" : "stream_id");
-                        if (id.isEmpty()) continue;
-                        String name = item.optString("name", "Untitled");
-                        String logo = item.optString(type.equals("live") ? "stream_icon" : "cover", "");
-                        String ext = item.optString("container_extension", "mp4");
-                        channelCard(name, logo, type, id, ext);
-                    }
+                    currentItems = items;
+                    currentBrowseType = type;
+                    nextItemIndex = 0;
+                    appendNextPage();
+
                 });
             } catch (Exception ex) {
                 runOnUiThread(() -> {
@@ -387,6 +388,37 @@ public class MainActivity extends Activity {
             }
         }).start();
     }
+
+    private void appendNextPage() {
+        if (currentItems == null || contentGrid == null) return;
+        int end = Math.min(currentItems.length(), nextItemIndex + PAGE_SIZE);
+        for (int i = nextItemIndex; i < end; i++) {
+            JSONObject item = currentItems.optJSONObject(i);
+            if (item == null) continue;
+            String id = item.optString(currentBrowseType.equals("series") ? "series_id" : "stream_id");
+            if (id.isEmpty()) continue;
+            String name = item.optString("name", "Untitled");
+            String ext = item.optString("container_extension", "mp4");
+            // Keep logos disabled until a bounded image loader is added.
+            channelCard(name, "", currentBrowseType, id, ext);
+        }
+        nextItemIndex = end;
+        if (nextItemIndex < currentItems.length()) {
+            Button more = tile("LOAD MORE  (" + nextItemIndex + " / " + currentItems.length() + ")",
+                Color.rgb(27, 94, 154), () -> {
+                    if (loadMoreButton != null) contentGrid.removeView(loadMoreButton);
+                    loadMoreButton = null;
+                    appendNextPage();
+                });
+            loadMoreButton = more;
+            GridLayout.LayoutParams gp = new GridLayout.LayoutParams();
+            gp.width = dp(155); gp.height = dp(90);
+            gp.setMargins(dp(6), dp(6), dp(6), dp(6));
+            contentGrid.addView(more, gp);
+        }
+    }
+
+    private Button loadMoreButton;
 
     private void channelCard(String name, String logo, String type, String id, String ext) {
         LinearLayout card = new LinearLayout(this);
@@ -413,18 +445,7 @@ public class MainActivity extends Activity {
         gp.width = dp(155); gp.height = dp(170);
         gp.setMargins(dp(6), dp(6), dp(6), dp(6));
         contentGrid.addView(card, gp);
-        if (logo.startsWith("https://") || logo.startsWith("http://")) {
-            new Thread(() -> {
-                try {
-                    HttpURLConnection conn = (HttpURLConnection) new URL(logo).openConnection();
-                    conn.setConnectTimeout(4500); conn.setReadTimeout(4500);
-                    Bitmap bmp;
-                    try (InputStream in = conn.getInputStream()) { bmp = BitmapFactory.decodeStream(in); }
-                    finally { conn.disconnect(); }
-                    if (bmp != null) runOnUiThread(() -> image.setImageBitmap(bmp));
-                } catch (Exception ignored) {}
-            }).start();
-        }
+
     }
 
     private void showEpisodes(String seriesId, String name) {
