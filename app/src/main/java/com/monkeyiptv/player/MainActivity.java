@@ -703,7 +703,23 @@ public class MainActivity extends Activity {
                     Intent install = new Intent(Intent.ACTION_VIEW);
                     install.setDataAndType(apk, "application/vnd.android.package-archive");
                     install.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
-                    try { startActivity(install); }
+                    try {
+                        if (Build.VERSION.SDK_INT >= 26 && !getPackageManager().canRequestPackageInstalls()) {
+                            status.setText("Allow Dream IPTV to install updates, then tap INSTALL DOWNLOADED UPDATE.");
+                            Intent settings = new Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                                Uri.parse("package:" + getPackageName()));
+                            startActivity(settings);
+                            button("INSTALL DOWNLOADED UPDATE", () -> {
+                                if (Build.VERSION.SDK_INT >= 26 && !getPackageManager().canRequestPackageInstalls()) {
+                                    status.setText("Enable Allow from this source in Android settings first.");
+                                    return;
+                                }
+                                startActivity(install);
+                            });
+                            return;
+                        }
+                        startActivity(install);
+                    }
                     catch (Exception e) { status.setText("Unable to open installer: " + e.getMessage()); }
                 }
             };
