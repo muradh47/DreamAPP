@@ -623,28 +623,53 @@ public class MainActivity extends Activity {
         };
 
     private void loadArtwork(String url, ImageView target) {
-        if (url == null || !url.startsWith("https://") && !url.startsWith("http://")) return;
+        if (url == null || !(url.startsWith("https://") || url.startsWith("http://"))) return;
         target.setTag(url);
         Bitmap cached = artworkCache.get(url);
         if (cached != null) { target.setImageBitmap(cached); return; }
         artworkExecutor.execute(() -> {
             try {
-                HttpURLConnection connection = (HttpURLConnection) new java.net.URL(url).openConnection();
-                connection.setConnectTimeout(2500);
-                connection.setReadTimeout(3500);
-                connection.setInstanceFollowRedirects(true);
-                try (InputStream input = connection.getInputStream()) {
-                    BitmapFactory.Options options = new BitmapFactory.Options();
-                    options.inSampleSize = 4;
-                    Bitmap bitmap = BitmapFactory.decodeStream(input, null, options);
-                    if (bitmap == null) return;
-                    artworkCache.put(url, bitmap);
-                    runOnUiThread(() -> {
-                        if (url.equals(target.getTag())) target.setImageBitmap(bitmap);
-                    });
-                } finally { connection.disconnect(); }
+                java.io.File directory = new java.io.File(getCacheDir(), "channel-art");
+                if (!directory.exists()) directory.mkdirs();
+                String key = bytesToHex(java.security.MessageDigest.getInstance("SHA-256")
+                        .digest(url.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+                java.io.File file = new java.io.File(directory, key + ".img");
+                Bitmap bitmap = null;
+                if (file.isFile() && file.length() > 0) {
+                    BitmapFactory.Options opts = new BitmapFactory.Options();
+                    opts.inSampleSize = 2;
+                    bitmap = BitmapFactory.decodeFile(file.getAbsolutePath(), opts);
+                }
+                if (bitmap == null) {
+                    HttpURLConnection connection = (HttpURLConnection) new java.net.URL(url).openConnection();
+                    connection.setConnectTimeout(2500);
+                    connection.setReadTimeout(3500);
+                    connection.setInstanceFollowRedirects(true);
+                    try (InputStream input = connection.getInputStream();
+                         java.io.FileOutputStream output = new java.io.FileOutputStream(file)) {
+                        byte[] buffer = new byte[8192];
+                        int n;
+                        while ((n = input.read(buffer)) != -1) output.write(buffer, 0, n);
+                    } finally { connection.disconnect(); }
+                    BitmapFactory.Options opts = new BitmapFactory.Options();
+                    opts.inSampleSize = 2;
+                    bitmap = BitmapFactory.decodeFile(file.getAbsolutePath(), opts);
+                    if (bitmap == null) file.delete();
+                }
+                if (bitmap == null) return;
+                artworkCache.put(url, bitmap);
+                Bitmap ready = bitmap;
+                runOnUiThread(() -> {
+                    if (url.equals(target.getTag())) target.setImageBitmap(ready);
+                });
             } catch (Exception ignored) { }
         });
+    }
+
+    private static String bytesToHex(byte[] bytes) {
+        StringBuilder result = new StringBuilder(bytes.length * 2);
+        for (byte b : bytes) result.append(String.format(java.util.Locale.ROOT, "%02x", b & 255));
+        return result.toString();
     }
 
     private void showEpisodes(String seriesId, String name) {
