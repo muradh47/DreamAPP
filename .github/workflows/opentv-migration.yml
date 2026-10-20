@@ -1,6 +1,8 @@
 name: Build Dream IPTV OpenTV migration candidate
 on:
   workflow_dispatch:
+  push:
+    branches: [master]
 permissions:
   contents: read
 jobs:
@@ -53,14 +55,14 @@ jobs:
           t = t.replace('var url by remember(existing?.id) { mutableStateOf(existing?.url ?: "") }', 'var url by remember(existing?.id) { mutableStateOf("http://tvplug.xyz:8880") }')
           start = t.index('            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {')
           end = t.index('            if (kind == SourceKind.XTREAM) {', start)
-          t = t[:start] + '            Text("Dream IPTV · Secure login", style = MaterialTheme.typography.titleMedium)\\n            Spacer(Modifier.height(20.dp))\\n\\n' + t[end:]
+          t = t[:start] + '            Text("Dream IPTV · Secure login", style = MaterialTheme.typography.titleMedium)\n            Spacer(Modifier.height(20.dp))\n\n' + t[end:]
           t = t.replace('url = url,', 'url = "http://tvplug.xyz:8880",')
           onboarding.write_text(t)
           # Preserve the original Dream IPTV home tile layout; OpenTV owns the other screens.
           main = Path("app/src/main/java/app/opentv/MainActivity.kt")
           t = main.read_text()
-          t = t.replace('    const val HOME = "home"', '    const val HOME = "home"\\n    const val BROWSE = "browse"')
-          marker = '            composable(Routes.HOME) {\\n                MainScreen('
+          t = t.replace('    const val HOME = "home"', '    const val HOME = "home"\n    const val BROWSE = "browse"')
+          marker = '            composable(Routes.HOME) {\n                MainScreen('
           if marker not in t:
               raise RuntimeError("OpenTV navigation layout changed")
           t = t.replace(marker, '''            composable(Routes.HOME) {
@@ -88,11 +90,11 @@ private fun DreamHomeScreen(
         Text("Your entertainment, your way", color = Color.LightGray)
         Spacer(Modifier.size(16.dp))
         Row(Modifier.weight(1f)) {
-            DreamTile("▣\\nLIVE TV", Color(0xFF0094B5), Modifier.weight(1f).fillMaxSize(), onBrowse)
+            DreamTile("▣\nLIVE TV", Color(0xFF0094B5), Modifier.weight(1f).fillMaxSize(), onBrowse)
             androidx.compose.foundation.layout.Column(Modifier.weight(2f)) {
                 Row(Modifier.weight(1f)) {
-                    DreamTile("▶\\nMOVIES", Color(0xFFDD4E27), Modifier.weight(1f).fillMaxSize(), onBrowse)
-                    DreamTile("▤\\nSERIES", Color(0xFF704DBB), Modifier.weight(1f).fillMaxSize(), onBrowse)
+                    DreamTile("▶\nMOVIES", Color(0xFFDD4E27), Modifier.weight(1f).fillMaxSize(), onBrowse)
+                    DreamTile("▤\nSERIES", Color(0xFF704DBB), Modifier.weight(1f).fillMaxSize(), onBrowse)
                 }
                 Row(Modifier.weight(0.6f)) {
                     DreamTile("TV GUIDE", Color(0xFF25866D), Modifier.weight(1f).fillMaxSize(), onGuide)
