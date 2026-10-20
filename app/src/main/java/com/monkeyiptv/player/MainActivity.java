@@ -676,10 +676,10 @@ public class MainActivity extends Activity {
             if (!url.startsWith("https://github.com/")) throw new IOException("Unexpected update URL");
             DownloadManager manager = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
             DownloadManager.Request request = new DownloadManager.Request(Uri.parse(url));
-            request.setTitle("MonkeyIPTV update");
+            request.setTitle("Dream IPTV update");
             request.setDescription("Downloading new version");
             request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
-            request.setDestinationInExternalFilesDir(this, android.os.Environment.DIRECTORY_DOWNLOADS, "monkeyiptv-update.apk");
+            request.setDestinationInExternalFilesDir(this, android.os.Environment.DIRECTORY_DOWNLOADS, "dream-iptv-update.apk");
             updateDownloadId = manager.enqueue(request);
             status.setText("Downloading update...");
             if (updateReceiver != null) unregisterReceiver(updateReceiver);
@@ -695,7 +695,7 @@ public class MainActivity extends Activity {
                     status.setText("Download complete. Confirm installation in Android.");
                     Uri apk = androidx.core.content.FileProvider.getUriForFile(
                         MainActivity.this, getPackageName() + ".fileprovider",
-                        new java.io.File(getExternalFilesDir(android.os.Environment.DIRECTORY_DOWNLOADS), "monkeyiptv-update.apk"));
+                        new java.io.File(getExternalFilesDir(android.os.Environment.DIRECTORY_DOWNLOADS), "dream-iptv-update.apk"));
                     Intent install = new Intent(Intent.ACTION_VIEW);
                     install.setDataAndType(apk, "application/vnd.android.package-archive");
                     install.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
