@@ -38,6 +38,8 @@ public class MainActivity extends Activity {
     private String currentType = "live";
     private String currentCategory = "";
     private String server = BuildConfig.SERVER_URL.replaceAll("/$", "");
+    private static final int UPDATE_INSTALL_REQUEST = 4701;
+    private TextView updateInstallStatus;
     private long updateDownloadId = -1;
     private BroadcastReceiver updateReceiver;
     private static final String RELEASES_API = "https://api.github.com/repos/muradh47/MonkeyIPTV/releases/latest";
@@ -797,7 +799,8 @@ public class MainActivity extends Activity {
                             " is not newer than installed version " + installedCode + ".");
                         return;
                     }
-                    status.setText("Download verified. Opening Android installer...");
+                    status.setText("APK checked. Waiting for Android installation confirmation...");
+                    updateInstallStatus = status;
                     Uri apk = androidx.core.content.FileProvider.getUriForFile(
                         MainActivity.this, getPackageName() + ".fileprovider",
                         new java.io.File(getExternalFilesDir(android.os.Environment.DIRECTORY_DOWNLOADS), downloadPath));
@@ -817,11 +820,11 @@ public class MainActivity extends Activity {
                                     status.setText("Enable Allow from this source in Android settings first.");
                                     return;
                                 }
-                                startActivity(install);
+                                startActivityForResult(install, UPDATE_INSTALL_REQUEST);
                             });
                             return;
                         }
-                        startActivity(install);
+                        startActivityForResult(install, UPDATE_INSTALL_REQUEST);
                     }
                     catch (Exception e) { status.setText("Unable to open installer: " + e.getMessage()); }
                 }
@@ -830,6 +833,22 @@ public class MainActivity extends Activity {
             if (Build.VERSION.SDK_INT >= 33) registerReceiver(updateReceiver, filter, Context.RECEIVER_EXPORTED);
             else registerReceiver(updateReceiver, filter);
         } catch (Exception e) { status.setText("Download failed: " + e.getMessage()); }
+    }
+
+    @Override protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode != UPDATE_INSTALL_REQUEST || updateInstallStatus == null) return;
+        if (resultCode == RESULT_OK) {
+            updateInstallStatus.setText("Android reports installation succeeded.");
+        } else {
+            int installResult = data == null ? 0 :
+                data.getIntExtra(android.content.pm.PackageInstaller.EXTRA_STATUS, 0);
+            String detail = data == null ? "" :
+                data.getStringExtra(android.content.pm.PackageInstaller.EXTRA_STATUS_MESSAGE);
+            updateInstallStatus.setText("Android did not confirm installation (result " + resultCode +
+                ", status " + installResult + ")." +
+                (detail == null || detail.isEmpty() ? " Check the installer message shown on screen." : " " + detail));
+        }
     }
 
     private static String enc(String value) throws Exception { return URLEncoder.encode(value, "UTF-8"); }
