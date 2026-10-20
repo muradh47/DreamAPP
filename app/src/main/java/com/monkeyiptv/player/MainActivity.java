@@ -483,8 +483,10 @@ public class MainActivity extends Activity {
             if (id.isEmpty()) continue;
             String name = item.optString("name", "Untitled");
             String ext = item.optString("container_extension", "mp4");
-            // Keep logos disabled until a bounded image loader is added.
-            channelCard(name, "", currentBrowseType, id, ext);
+            String logo = currentBrowseType.equals("live") ? item.optString("stream_icon") :
+                currentBrowseType.equals("vod") ? item.optString("stream_icon", item.optString("cover")) :
+                item.optString("cover", item.optString("stream_icon"));
+            channelCard(name, logo, currentBrowseType, id, ext, item);
         }
         nextItemIndex = end;
         if (nextItemIndex < currentItems.length()) {
@@ -504,7 +506,7 @@ public class MainActivity extends Activity {
 
     private Button loadMoreButton;
 
-    private void channelCard(String name, String logo, String type, String id, String ext) {
+    private void channelCard(String name, String logo, String type, String id, String ext, JSONObject metadata) {
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
         card.setBackgroundColor(Color.rgb(29, 36, 52));
@@ -520,16 +522,67 @@ public class MainActivity extends Activity {
         image.setScaleType(ImageView.ScaleType.FIT_CENTER);
         image.setPadding(dp(8), dp(8), dp(8), dp(8));
         card.addView(image, new LinearLayout.LayoutParams(-1, dp(105)));
+        loadArtwork(logo, image);
         TextView label = text(name);
         label.setTextSize(14);
         label.setMaxLines(2);
         label.setGravity(Gravity.CENTER);
-        card.addView(label, new LinearLayout.LayoutParams(-1, dp(56)));
+        card.addView(label, new LinearLayout.LayoutParams(-1, dp(45)));
+        if (!type.equals("live")) {
+            String rating = metadata.optString("rating_5based", metadata.optString("rating", ""));
+            String year = metadata.optString("releaseDate", metadata.optString("release_date", ""));
+            String imdb = metadata.optString("imdb_id", "");
+            String details = (year.length() >= 4 ? year.substring(0, 4) : "") +
+                (!rating.isEmpty() ? "  ★ " + rating : "") +
+                (!imdb.isEmpty() ? "  IMDb" : "");
+            if (!details.trim().isEmpty()) {
+                TextView info = text(details.trim());
+                info.setTextSize(11);
+                info.setTextColor(Color.LTGRAY);
+                info.setGravity(Gravity.CENTER);
+                info.setSingleLine(true);
+                card.addView(info, new LinearLayout.LayoutParams(-1, dp(18)));
+            }
+        }
         GridLayout.LayoutParams gp = new GridLayout.LayoutParams();
         gp.width = dp(155); gp.height = dp(170);
         gp.setMargins(dp(6), dp(6), dp(6), dp(6));
         contentGrid.addView(card, gp);
 
+    }
+
+    private final java.util.concurrent.ExecutorService artworkExecutor =
+        java.util.concurrent.Executors.newFixedThreadPool(4);
+    private final android.util.LruCache<String, Bitmap> artworkCache =
+        new android.util.LruCache<String, Bitmap>(48) {
+            @Override protected int sizeOf(String key, Bitmap bitmap) {
+                return Math.max(1, bitmap.getByteCount() / 1024 / 1024);
+            }
+        };
+
+    private void loadArtwork(String url, ImageView target) {
+        if (url == null || !url.startsWith("https://") && !url.startsWith("http://")) return;
+        target.setTag(url);
+        Bitmap cached = artworkCache.get(url);
+        if (cached != null) { target.setImageBitmap(cached); return; }
+        artworkExecutor.execute(() -> {
+            try {
+                HttpURLConnection connection = (HttpURLConnection) new java.net.URL(url).openConnection();
+                connection.setConnectTimeout(5000);
+                connection.setReadTimeout(7000);
+                connection.setInstanceFollowRedirects(true);
+                try (InputStream input = connection.getInputStream()) {
+                    BitmapFactory.Options options = new BitmapFactory.Options();
+                    options.inSampleSize = 2;
+                    Bitmap bitmap = BitmapFactory.decodeStream(input, null, options);
+                    if (bitmap == null) return;
+                    artworkCache.put(url, bitmap);
+                    runOnUiThread(() -> {
+                        if (url.equals(target.getTag())) target.setImageBitmap(bitmap);
+                    });
+                } finally { connection.disconnect(); }
+            } catch (Exception ignored) { }
+        });
     }
 
     private void showEpisodes(String seriesId, String name) {
