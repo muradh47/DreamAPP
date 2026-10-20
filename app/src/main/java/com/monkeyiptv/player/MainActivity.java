@@ -250,7 +250,7 @@ public class MainActivity extends Activity {
 
     private void showFullscreenLive(String id, String channel, boolean fromGuide) {
         releasePlayer();
-        setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
+        setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
         getWindow().getDecorView().setSystemUiVisibility(
             View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION |
             View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY | View.SYSTEM_UI_FLAG_LAYOUT_STABLE |
@@ -271,7 +271,7 @@ public class MainActivity extends Activity {
         fullscreen.addView(back, backParams);
         back.setOnClickListener(v -> {
             releasePlayer();
-            setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
+            setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
             getWindow().getDecorView().setSystemUiVisibility(0);
             if (fromGuide) showGuide(); else showCategories("live");
         });
