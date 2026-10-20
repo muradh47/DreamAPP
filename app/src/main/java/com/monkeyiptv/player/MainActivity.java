@@ -8,6 +8,8 @@ import android.graphics.Color;
 import android.widget.*;
 import android.view.View;
 import androidx.media3.common.MediaItem;
+import androidx.media3.common.PlaybackException;
+import androidx.media3.common.Player;
 import androidx.media3.exoplayer.ExoPlayer;
 import androidx.media3.ui.PlayerView;
 import org.json.JSONArray;
@@ -58,8 +60,18 @@ public class MainActivity extends Activity {
         return b;
     }
 
+    private void homeTile(String title, String subtitle, Runnable action) {
+        Button tile = button(title + "\\n" + subtitle, action);
+        tile.setTextSize(22);
+        tile.setTextColor(Color.WHITE);
+        tile.setBackgroundTintList(android.content.res.ColorStateList.valueOf(Color.rgb(28, 77, 143)));
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, 132);
+        params.setMargins(6, 10, 6, 10);
+        tile.setLayoutParams(params);
+    }
+
     private void showLogin() {
-        screen("MONKEY IPTV  •  Sign in");
+        screen("DREAM IPTV  •  Sign in");
         EditText user = new EditText(this);
         user.setHint("Username"); user.setSingleLine(true);
         user.setTextColor(Color.WHITE); user.setHintTextColor(Color.LTGRAY); root.addView(user);
@@ -88,12 +100,12 @@ public class MainActivity extends Activity {
 
     private void showHome() {
         releasePlayer();
-        screen("MONKEY IPTV");
+        screen("DREAM IPTV");
         root.addView(text("Welcome back  •  Choose what to watch"));
-        button("📺   LIVE TV", () -> showCategories("live"));
-        button("🎬   MOVIES", () -> showCategories("vod"));
-        button("📺   SERIES", () -> showCategories("series"));
-        button("⬇   Check for app updates", this::checkUpdates);
+        homeTile("LIVE TV", "Browse live channels", () -> showCategories("live"));
+        homeTile("MOVIES", "Watch films", () -> showCategories("vod"));
+        homeTile("SERIES", "Browse episodes", () -> showCategories("series"));
+        homeTile("SETTINGS", "Check for updates", this::checkUpdates);
         button("Log out", () -> {
             getPreferences(0).edit().clear().apply();
             username = ""; password = ""; showLogin();
@@ -213,7 +225,28 @@ public class MainActivity extends Activity {
         String folder = type.equals("vod") ? "movie" : type;
         String safeExt = ext.matches("[a-zA-Z0-9]{1,5}") ? ext : "mp4";
         String stream = server + "/" + folder + "/" + path(username) + "/" + path(password) + "/" + path(id) + "." + safeExt;
-        player.setMediaItem(MediaItem.fromUri(stream));
+        TextView playbackStatus = text("Connecting to stream...");
+        root.addView(playbackStatus);
+        final String initialStream = stream;
+        player.addListener(new Player.Listener() {
+            private boolean retriedHls = false;
+            @Override public void onPlaybackStateChanged(int state) {
+                if (state == Player.STATE_READY) playbackStatus.setText("");
+                else if (state == Player.STATE_BUFFERING) playbackStatus.setText("Buffering...");
+            }
+            @Override public void onPlayerError(PlaybackException error) {
+                if (type.equals("live") && !retriedHls) {
+                    retriedHls = true;
+                    String hls = server + "/live/" + path(username) + "/" + path(password) + "/" + path(id) + ".m3u8";
+                    playbackStatus.setText("Trying HLS stream...");
+                    player.setMediaItem(MediaItem.fromUri(hls));
+                    player.prepare(); player.play();
+                } else {
+                    playbackStatus.setText("Playback failed: " + error.getErrorCodeName() + " - " + error.getMessage());
+                }
+            }
+        });
+        player.setMediaItem(MediaItem.fromUri(initialStream));
         player.prepare(); player.play();
     }
 
