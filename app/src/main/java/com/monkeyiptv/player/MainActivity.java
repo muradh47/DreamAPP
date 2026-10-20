@@ -244,6 +244,32 @@ public class MainActivity extends Activity {
 
     private void showEpg(String id, String channel, boolean fromGuide) {
         releasePlayer();
+        showFullscreenLive(id, channel, fromGuide);
+    }
+
+    private void showFullscreenLive(String id, String channel, boolean fromGuide) {
+        releasePlayer();
+        setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
+        getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
+        screen(channel);
+        button("← BACK TO GUIDE", () -> {
+            releasePlayer();
+            setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
+            getWindow().getDecorView().setSystemUiVisibility(0);
+            showGuide();
+        });
+        PlayerView fullscreenView = new PlayerView(this);
+        fullscreenView.setUseController(true);
+        fullscreenView.setControllerShowTimeoutMs(3500);
+        root.addView(fullscreenView, new LinearLayout.LayoutParams(-1, dp(320)));
+        startStream("live", id, "ts", fullscreenView);
+        TextView fullscreenStatus = text("Connecting to channel...");
+        root.addView(fullscreenStatus);
+        attachPlaybackStatus(fullscreenStatus, id);
+    }
+
+    private void showEpgInline(String id, String channel, boolean fromGuide) {
+        releasePlayer();
         screen(channel);
         button("← " + (fromGuide ? "TV Guide" : "Channels"),
             () -> { releasePlayer(); if (fromGuide) showGuide(); else showCategories("live"); });
