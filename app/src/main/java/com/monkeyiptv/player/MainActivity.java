@@ -247,6 +247,7 @@ public class MainActivity extends Activity {
             () -> { releasePlayer(); if (fromGuide) showGuide(); else showCategories("live"); });
         PlayerView view = new PlayerView(this);
         root.addView(view, new LinearLayout.LayoutParams(-1, dp(240)));
+        addFullscreenToggle(view);
         startStream("live", id, "ts", view);
         TextView playbackStatus = text("Connecting to live stream...");
         root.addView(playbackStatus);
@@ -270,6 +271,29 @@ public class MainActivity extends Activity {
             }
         };
         epgHandler.post(epgRefresh);
+    }
+
+    private void addFullscreenToggle(PlayerView view) {
+        Button fullscreen = button("⛶ FULL SCREEN", () -> {});
+        final boolean[] expanded = {false};
+        final int normalHeight = ((LinearLayout.LayoutParams) view.getLayoutParams()).height;
+        fullscreen.setOnClickListener(v -> {
+            expanded[0] = !expanded[0];
+            boolean full = expanded[0];
+            for (int i = 0; i < root.getChildCount(); i++) {
+                android.view.View child = root.getChildAt(i);
+                if (child != view && child != fullscreen) child.setVisibility(full ? android.view.View.GONE : android.view.View.VISIBLE);
+            }
+            LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) view.getLayoutParams();
+            lp.height = full ? getResources().getDisplayMetrics().heightPixels : normalHeight;
+            view.setLayoutParams(lp);
+            getWindow().getDecorView().setSystemUiVisibility(full
+                ? (android.view.View.SYSTEM_UI_FLAG_FULLSCREEN | android.view.View.SYSTEM_UI_FLAG_HIDE_NAVIGATION |
+                   android.view.View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY | android.view.View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN |
+                   android.view.View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION)
+                : 0);
+            fullscreen.setText(full ? "EXIT FULL SCREEN" : "⛶ FULL SCREEN");
+        });
     }
 
     private void loadChannelEpg(String id, int request, TextView now, TextView next, LinearLayout schedule) {
@@ -552,7 +576,7 @@ public class MainActivity extends Activity {
     }
 
     private final java.util.concurrent.ExecutorService artworkExecutor =
-        java.util.concurrent.Executors.newFixedThreadPool(4);
+        java.util.concurrent.Executors.newFixedThreadPool(8);
     private final android.util.LruCache<String, Bitmap> artworkCache =
         new android.util.LruCache<String, Bitmap>(48) {
             @Override protected int sizeOf(String key, Bitmap bitmap) {
@@ -568,12 +592,12 @@ public class MainActivity extends Activity {
         artworkExecutor.execute(() -> {
             try {
                 HttpURLConnection connection = (HttpURLConnection) new java.net.URL(url).openConnection();
-                connection.setConnectTimeout(5000);
-                connection.setReadTimeout(7000);
+                connection.setConnectTimeout(2500);
+                connection.setReadTimeout(3500);
                 connection.setInstanceFollowRedirects(true);
                 try (InputStream input = connection.getInputStream()) {
                     BitmapFactory.Options options = new BitmapFactory.Options();
-                    options.inSampleSize = 2;
+                    options.inSampleSize = 4;
                     Bitmap bitmap = BitmapFactory.decodeStream(input, null, options);
                     if (bitmap == null) return;
                     artworkCache.put(url, bitmap);
@@ -620,6 +644,7 @@ public class MainActivity extends Activity {
         button("← Back", () -> { releasePlayer(); if (type.equals("live")) showItems("live", currentCategory); else showCategories(type); });
         PlayerView view = new PlayerView(this);
         root.addView(view, new LinearLayout.LayoutParams(-1, getResources().getDisplayMetrics().heightPixels * 2 / 3));
+        addFullscreenToggle(view);
         player = new ExoPlayer.Builder(this).build();
         view.setPlayer(player);
         String folder = type.equals("vod") ? "movie" : type;
