@@ -166,6 +166,18 @@ jobs:
           shell_code = shell_code.replace('fun MainScreen(\n    isTelevision:', 'fun MainScreen(\n    initialSection: String = "live",\n    isTelevision:')
           shell_code = shell_code.replace('var tab by remember { mutableStateOf(homeTab) }', 'var tab by remember(initialSection) { mutableStateOf(when (initialSection) { "movies" -> Tab.MOVIES; "shows" -> Tab.SHOWS; else -> Tab.LIVE }.takeIf { it in visibleTabs } ?: homeTab) }')
           Path("app/src/main/java/app/opentv/ui/MainScreen.kt").write_text(shell_code)
+          # Android Back must return from OpenTV browse to the Dream IPTV dashboard.
+          shell_path = Path("app/src/main/java/app/opentv/ui/MainScreen.kt")
+          shell_code = shell_path.read_text()
+          shell_code = shell_code.replace('    initialSection: String = "live",', '    initialSection: String = "live",\n    onNavigateHome: () -> Unit = {},')
+          shell_code = shell_code.replace('BackHandler(enabled = tab == homeTab) { showExit = true }', 'BackHandler(enabled = tab == homeTab) { onNavigateHome() }')
+          shell_path.write_text(shell_code)
+          main_code = main.read_text()
+          main_code = main_code.replace('initialSection = entry.arguments?.getString("section") ?: "live",', 'initialSection = entry.arguments?.getString("section") ?: "live",\n                    onNavigateHome = { navController.popBackStack() },')
+          # The dashboard is the app root; Back should not accidentally exit it.
+          main_code = main_code.replace('private fun DreamHomeScreen(\n', 'private fun DreamHomeScreen(\n')
+          main_code = main_code.replace('          ) {\n              androidx.compose.foundation.layout.Column(', '          ) {\n              androidx.activity.compose.BackHandler(enabled = true) { }\n              androidx.compose.foundation.layout.Column(', 1)
+          main.write_text(main_code)
           # Point both automatic and manual updates at Dream IPTV releases, never OpenTV.
           checker = Path("app/src/main/java/app/opentv/update/UpdateChecker.kt")
           update_code = checker.read_text()
