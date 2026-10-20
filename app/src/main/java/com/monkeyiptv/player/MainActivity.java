@@ -120,6 +120,14 @@ public class MainActivity extends Activity {
         root.addView(subtitle);
 
         EditText user = loginField("Username", false);
+        android.content.SharedPreferences prefs = getPreferences(0);
+        boolean rememberEnabled = prefs.getBoolean("remember_username", false);
+        if (rememberEnabled) user.setText(prefs.getString("saved_username", ""));
+        CheckBox remember = new CheckBox(this);
+        remember.setText("Remember username");
+        remember.setTextColor(Color.WHITE);
+        remember.setChecked(rememberEnabled);
+        root.addView(remember);
         EditText pass = loginField("Password", true);
         TextView status = text("");
         status.setGravity(Gravity.CENTER);
@@ -135,7 +143,13 @@ public class MainActivity extends Activity {
                     if (info == null || !"Active".equalsIgnoreCase(info.optString("status")))
                         throw new IOException("Login failed or account inactive");
                     username = u; password = p;
-                    getPreferences(0).edit().putString("username", u).putString("password", p).apply();
+                    boolean saveUsername = remember.isChecked();
+                    android.content.SharedPreferences.Editor editor = getPreferences(0).edit()
+                        .putString("username", u).putString("password", p)
+                        .putBoolean("remember_username", saveUsername);
+                    if (saveUsername) editor.putString("saved_username", u);
+                    else editor.remove("saved_username");
+                    editor.apply();
                     runOnUiThread(this::showHome);
                 } catch (Exception ex) { runOnUiThread(() -> status.setText("Login failed: " + ex.getMessage())); }
             }).start();
@@ -187,7 +201,7 @@ public class MainActivity extends Activity {
         LinearLayout tools = row();
         addTile(tools, "CHECK UPDATES", Color.rgb(38, 57, 89), 88, this::checkUpdates);
         addTile(tools, "LOG OUT", Color.rgb(38, 57, 89), 88, () -> {
-            getPreferences(0).edit().clear().apply();
+            getPreferences(0).edit().remove("username").remove("password").apply();
             username = ""; password = ""; showLogin();
         });
     }
