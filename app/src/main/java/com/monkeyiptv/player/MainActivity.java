@@ -60,14 +60,26 @@ public class MainActivity extends Activity {
         return b;
     }
 
-    private void homeTile(String title, String subtitle, Runnable action) {
-        Button tile = button(title + "\\n" + subtitle, action);
-        tile.setTextSize(22);
-        tile.setTextColor(Color.WHITE);
-        tile.setBackgroundTintList(android.content.res.ColorStateList.valueOf(Color.rgb(28, 77, 143)));
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, 132);
-        params.setMargins(6, 10, 6, 10);
-        tile.setLayoutParams(params);
+    private Button tile(String title, int color, Runnable action) {
+        Button b = new Button(this);
+        b.setText(title); b.setTextSize(20); b.setAllCaps(false);
+        b.setTextColor(Color.WHITE); b.setFocusable(true);
+        b.setBackgroundTintList(android.content.res.ColorStateList.valueOf(color));
+        b.setOnClickListener(v -> action.run());
+        return b;
+    }
+
+    private void addTile(LinearLayout row, String title, int color, int height, Runnable action) {
+        Button b = tile(title, color, action);
+        LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(0, height, 1f);
+        p.setMargins(7, 7, 7, 7); row.addView(b, p);
+    }
+
+    private LinearLayout row() {
+        LinearLayout r = new LinearLayout(this);
+        r.setOrientation(LinearLayout.HORIZONTAL);
+        root.addView(r, new LinearLayout.LayoutParams(-1, -2));
+        return r;
     }
 
     private void showLogin() {
@@ -101,15 +113,78 @@ public class MainActivity extends Activity {
     private void showHome() {
         releasePlayer();
         screen("DREAM IPTV");
-        root.addView(text("Welcome back  •  Choose what to watch"));
-        homeTile("LIVE TV", "Browse live channels", () -> showCategories("live"));
-        homeTile("MOVIES", "Watch films", () -> showCategories("vod"));
-        homeTile("SERIES", "Browse episodes", () -> showCategories("series"));
-        homeTile("SETTINGS", "Check for updates", this::checkUpdates);
-        button("Log out", () -> {
+        root.addView(text("Your entertainment, your way"));
+        LinearLayout main = row();
+        addTile(main, "▣\\nLIVE TV", Color.rgb(0, 148, 181), 230, () -> showCategories("live"));
+        LinearLayout right = new LinearLayout(this);
+        right.setOrientation(LinearLayout.VERTICAL);
+        main.addView(right, new LinearLayout.LayoutParams(0, -2, 2f));
+        LinearLayout top = new LinearLayout(this);
+        right.addView(top);
+        addTile(top, "▶\\nMOVIES", Color.rgb(221, 78, 39), 145, () -> showCategories("vod"));
+        addTile(top, "▤\\nSERIES", Color.rgb(112, 77, 187), 145, () -> showCategories("series"));
+        LinearLayout lower = new LinearLayout(this);
+        right.addView(lower);
+        addTile(lower, "TV GUIDE", Color.rgb(37, 134, 109), 73, this::showGuide);
+        addTile(lower, "CATCH UP", Color.rgb(36, 120, 97), 73, () -> showCategories("live"));
+        LinearLayout tools = row();
+        addTile(tools, "CHECK UPDATES", Color.rgb(38, 57, 89), 72, this::checkUpdates);
+        addTile(tools, "LOG OUT", Color.rgb(38, 57, 89), 72, () -> {
             getPreferences(0).edit().clear().apply();
             username = ""; password = ""; showLogin();
         });
+    }
+
+    private void showGuide() {
+        screen("Loading TV guide...");
+        new Thread(() -> {
+            try {
+                JSONArray channels = new JSONArray(fetch(api(username, password, "get_live_streams")));
+                runOnUiThread(() -> {
+                    screen("TV GUIDE");
+                    button("← Home", this::showHome);
+                    for (int i = 0; i < channels.length(); i++) {
+                        JSONObject ch = channels.optJSONObject(i);
+                        if (ch == null) continue;
+                        String id = ch.optString("stream_id");
+                        if (id.isEmpty()) continue;
+                        button(ch.optString("name", "Channel") + "  →", () -> showEpg(id, ch.optString("name")));
+                    }
+                });
+            } catch (Exception ex) { runOnUiThread(() -> {
+                screen("TV guide unavailable"); root.addView(text(ex.getMessage()));
+                button("← Home", this::showHome);
+            }); }
+        }).start();
+    }
+
+    private void showEpg(String id, String channel) {
+        screen("Loading programmes...");
+        new Thread(() -> {
+            try {
+                JSONObject data = new JSONObject(fetch(api(username, password, "get_short_epg") + "&stream_id=" + enc(id) + "&limit=12"));
+                JSONArray entries = data.optJSONArray("epg_listings");
+                runOnUiThread(() -> {
+                    screen(channel + " • TV guide");
+                    button("← Guide", this::showGuide);
+                    button("▶ Watch channel", () -> play("live", id, "ts"));
+                    if (entries == null || entries.length() == 0) {
+                        root.addView(text("No EPG supplied for this channel.")); return;
+                    }
+                    for (int i = 0; i < entries.length(); i++) {
+                        JSONObject item = entries.optJSONObject(i);
+                        if (item == null) continue;
+                        String title = item.optString("title", "");
+                        try { title = new String(android.util.Base64.decode(title, android.util.Base64.DEFAULT), "UTF-8"); }
+                        catch (Exception ignored) {}
+                        root.addView(text(item.optString("start", "") + "  " + title));
+                    }
+                });
+            } catch (Exception ex) { runOnUiThread(() -> {
+                screen("TV guide unavailable"); root.addView(text(ex.getMessage()));
+                button("← Guide", this::showGuide);
+            }); }
+        }).start();
     }
 
     private String api(String u, String p, String action) throws Exception {
@@ -219,7 +294,7 @@ public class MainActivity extends Activity {
         screen("Now playing");
         button("← Back", () -> { releasePlayer(); showCategories(type); });
         PlayerView view = new PlayerView(this);
-        root.addView(view, new LinearLayout.LayoutParams(-1, 600));
+        root.addView(view, new LinearLayout.LayoutParams(-1, getResources().getDisplayMetrics().heightPixels * 2 / 3));
         player = new ExoPlayer.Builder(this).build();
         view.setPlayer(player);
         String folder = type.equals("vod") ? "movie" : type;
@@ -242,7 +317,7 @@ public class MainActivity extends Activity {
                     player.setMediaItem(MediaItem.fromUri(hls));
                     player.prepare(); player.play();
                 } else {
-                    playbackStatus.setText("Playback failed: " + error.getErrorCodeName() + " - " + error.getMessage());
+                    playbackStatus.setText("Playback failed: " + error.getErrorCodeName() + " - " + error.getMessage() + "\\nCheck that the account allows streaming and the provider supports this format.");
                 }
             }
         });
@@ -272,7 +347,7 @@ public class MainActivity extends Activity {
     private String fetchAbsolute(String url) throws Exception {
         HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
         c.setConnectTimeout(12000); c.setReadTimeout(20000);
-        c.setRequestProperty("User-Agent", "MonkeyIPTV-Android");
+        c.setRequestProperty("User-Agent", "DreamIPTV-Android");
         try {
             if (c.getResponseCode() >= 400) throw new IOException("HTTP " + c.getResponseCode());
             try (InputStream in = c.getInputStream(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
