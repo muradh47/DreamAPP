@@ -76,20 +76,20 @@ jobs:
             composable(Routes.BROWSE) {
                 MainScreen(''', 1)
           t += """
-@Composable
-private fun DreamHomeScreen(
-    onBrowse: () -> Unit,
-    onGuide: () -> Unit,
-    onUpdates: () -> Unit,
-    onLogout: () -> Unit,
-) {
-    androidx.compose.foundation.layout.Column(
-        modifier = Modifier.fillMaxSize().background(Color(0xFF101827)).padding(20.dp),
-    ) {
-        Text("DREAM IPTV", style = MaterialTheme.typography.headlineMedium, color = Color.White)
-        Text("Your entertainment, your way", color = Color.LightGray)
-        Spacer(Modifier.size(16.dp))
-        Row(Modifier.weight(1f)) {
+          @Composable
+          private fun DreamHomeScreen(
+              onBrowse: () -> Unit,
+              onGuide: () -> Unit,
+              onUpdates: () -> Unit,
+              onLogout: () -> Unit,
+          ) {
+              androidx.compose.foundation.layout.Column(
+                  modifier = Modifier.fillMaxSize().background(Color(0xFF101827)).padding(20.dp),
+              ) {
+                  Text("DREAM IPTV", style = MaterialTheme.typography.headlineMedium, color = Color.White)
+                  Text("Your entertainment, your way", color = Color.LightGray)
+                  Spacer(Modifier.size(16.dp))
+                  Row(Modifier.weight(1f)) {
             DreamTile("▣\nLIVE TV", Color(0xFF0094B5), Modifier.weight(1f).fillMaxSize(), onBrowse)
             androidx.compose.foundation.layout.Column(Modifier.weight(2f)) {
                 Row(Modifier.weight(1f)) {
@@ -101,30 +101,30 @@ private fun DreamHomeScreen(
                     DreamTile("CATCH UP", Color(0xFF247861), Modifier.weight(1f).fillMaxSize(), onBrowse)
                 }
             }
-        }
-        Row(Modifier.fillMaxSize().weight(0.28f)) {
+                  }
+                  Row(Modifier.fillMaxSize().weight(0.28f)) {
             DreamTile("CHECK UPDATES", Color(0xFF263959), Modifier.weight(1f).fillMaxSize(), onUpdates)
             DreamTile("LOG OUT", Color(0xFF263959), Modifier.weight(1f).fillMaxSize(), onLogout)
-        }
-    }
-}
+                  }
+              }
+          }
 
-@Composable
-private fun DreamTile(
-    label: String,
-    color: Color,
-    modifier: Modifier,
-    onClick: () -> Unit,
-) {
-    Box(
-        modifier = modifier.padding(4.dp).clip(RoundedCornerShape(12.dp))
+          @Composable
+          private fun DreamTile(
+              label: String,
+              color: Color,
+              modifier: Modifier,
+              onClick: () -> Unit,
+          ) {
+              Box(
+                  modifier = modifier.padding(4.dp).clip(RoundedCornerShape(12.dp))
             .background(color).clickable(onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(label, color = Color.White, style = MaterialTheme.typography.titleLarge)
-    }
-}
-"""
+                  contentAlignment = Alignment.Center,
+              ) {
+                  Text(label, color = Color.White, style = MaterialTheme.typography.titleLarge)
+              }
+          }
+          """
           main.write_text(t)
           PY
           echo "KEYSTORE_PATH=$RUNNER_TEMP/dream.keystore" >> "$GITHUB_ENV"
