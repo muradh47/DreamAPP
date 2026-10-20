@@ -1,8 +1,6 @@
 name: Build Dream IPTV OpenTV migration candidate
 on:
   workflow_dispatch:
-  push:
-    branches: [master]
 permissions:
   contents: read
 jobs:
