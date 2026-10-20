@@ -75,7 +75,7 @@ jobs:
             }
             composable(Routes.BROWSE) {
                 MainScreen(''', 1)
-          t += """
+          t += r"""
           @Composable
           private fun DreamHomeScreen(
               onBrowse: () -> Unit,
