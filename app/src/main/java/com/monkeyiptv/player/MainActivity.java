@@ -251,7 +251,7 @@ public class MainActivity extends Activity {
         try {
             byte[] bytes = android.util.Base64.decode(raw, android.util.Base64.DEFAULT);
             String decoded = new String(bytes, java.nio.charset.StandardCharsets.UTF_8);
-            return decoded.indexOf('\\uFFFD') >= 0 ? raw : decoded;
+            return decoded.indexOf((char) 0xFFFD) >= 0 ? raw : decoded;
         } catch (Exception ignored) { return raw; }
     }
 
