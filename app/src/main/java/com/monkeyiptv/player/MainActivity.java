@@ -24,6 +24,7 @@ public class MainActivity extends Activity {
     private ExoPlayer player;
     private String username, password;
     private String currentType = "live";
+    private String currentCategory = "";
     private String server = BuildConfig.SERVER_URL.replaceAll("/$", "");
     private static final String RELEASES_API = "https://api.github.com/repos/muradh47/MonkeyIPTV/releases/latest";
 
@@ -200,33 +201,58 @@ public class MainActivity extends Activity {
         }).start();
     }
 
+    private void showChannel(String id, String name) {
+        showEpg(id, name, false);
+    }
+
     private void showEpg(String id, String channel) {
-        screen("Loading programmes...");
+        showEpg(id, channel, true);
+    }
+
+    private void showEpg(String id, String channel, boolean fromGuide) {
+        screen(channel);
+        button("← " + (fromGuide ? "TV Guide" : "Channels"),
+            () -> { if (fromGuide) showGuide(); else showItems("live", currentCategory); });
+        button("▶ WATCH LIVE", () -> play("live", id, "ts"));
+        root.addView(text("TV PROGRAMME GUIDE"));
+        TextView status = text("Loading programme information...");
+        root.addView(status);
         new Thread(() -> {
             try {
-                JSONObject data = new JSONObject(fetch(api(username, password, "get_short_epg") + "&stream_id=" + enc(id) + "&limit=12"));
+                JSONObject data = new JSONObject(fetch(api(username, password, "get_short_epg") + "&stream_id=" + enc(id) + "&limit=20"));
                 JSONArray entries = data.optJSONArray("epg_listings");
                 runOnUiThread(() -> {
-                    screen(channel + " • TV guide");
-                    button("← Guide", this::showGuide);
-                    button("▶ Watch channel", () -> play("live", id, "ts"));
-                    if (entries == null || entries.length() == 0) {
-                        root.addView(text("No EPG supplied for this channel.")); return;
-                    }
+                    status.setText(entries == null || entries.length() == 0
+                        ? "No EPG available from the provider for this channel."
+                        : "Programme schedule");
+                    if (entries == null) return;
                     for (int i = 0; i < entries.length(); i++) {
                         JSONObject item = entries.optJSONObject(i);
                         if (item == null) continue;
-                        String title = item.optString("title", "");
-                        try { title = new String(android.util.Base64.decode(title, android.util.Base64.DEFAULT), "UTF-8"); }
-                        catch (Exception ignored) {}
-                        root.addView(text(item.optString("start", "") + "  " + title));
+                        String title = decodeEpg(item.optString("title", ""));
+                        String desc = decodeEpg(item.optString("description", ""));
+                        String start = item.optString("start", "");
+                        String end = item.optString("end", "");
+                        TextView programme = text(start + " - " + end + "\\n" + title
+                            + (desc.isEmpty() ? "" : "\\n" + desc));
+                        programme.setTextSize(16);
+                        programme.setBackgroundColor(i % 2 == 0 ? Color.rgb(24, 37, 62) : Color.rgb(18, 28, 49));
+                        root.addView(programme);
                     }
                 });
-            } catch (Exception ex) { runOnUiThread(() -> {
-                screen("TV guide unavailable"); root.addView(text(ex.getMessage()));
-                button("← Guide", this::showGuide);
-            }); }
+            } catch (Exception ex) {
+                runOnUiThread(() -> status.setText("EPG unavailable: " + ex.getMessage()));
+            }
         }).start();
+    }
+
+    private String decodeEpg(String raw) {
+        if (raw.isEmpty()) return raw;
+        try {
+            byte[] bytes = android.util.Base64.decode(raw, android.util.Base64.DEFAULT);
+            String decoded = new String(bytes, java.nio.charset.StandardCharsets.UTF_8);
+            return decoded.indexOf('\\uFFFD') >= 0 ? raw : decoded;
+        } catch (Exception ignored) { return raw; }
     }
 
     private String api(String u, String p, String action) throws Exception {
@@ -268,6 +294,7 @@ public class MainActivity extends Activity {
 
     private void showItems(String type, String categoryId) {
         currentType = type;
+        currentCategory = categoryId;
         screen("Loading...");
         new Thread(() -> {
             try {
@@ -279,6 +306,7 @@ public class MainActivity extends Activity {
                 runOnUiThread(() -> {
                     screen(type.equals("live") ? "Live channels" : type.equals("vod") ? "Movies" : "Series");
                     button("← Categories", () -> showCategories(type));
+                    root.addView(text(type.equals("live") ? "Select a channel to view programmes and watch" : type.equals("vod") ? "Select a movie to play" : "Select a series to browse seasons"));
                     for (int i = 0; i < items.length(); i++) {
                         JSONObject item = items.optJSONObject(i);
                         if (item == null) continue;
@@ -287,7 +315,8 @@ public class MainActivity extends Activity {
                         String name = item.optString("name", "Untitled");
                         button(name, () -> {
                             if (type.equals("series")) showEpisodes(id, name);
-                            else play(type, id, type.equals("vod") ? item.optString("container_extension", "mp4") : "ts");
+                            else if (type.equals("live")) showChannel(id, name);
+                            else play(type, id, item.optString("container_extension", "mp4"));
                         });
                     }
                     if (items.length() == 0) root.addView(text("No items in this category."));
@@ -334,7 +363,7 @@ public class MainActivity extends Activity {
     private void play(String type, String id, String ext) {
         releasePlayer();
         screen("Now playing");
-        button("← Back", () -> { releasePlayer(); showCategories(type); });
+        button("← Back", () -> { releasePlayer(); if (type.equals("live")) showItems("live", currentCategory); else showCategories(type); });
         PlayerView view = new PlayerView(this);
         root.addView(view, new LinearLayout.LayoutParams(-1, getResources().getDisplayMetrics().heightPixels * 2 / 3));
         player = new ExoPlayer.Builder(this).build();
@@ -403,7 +432,7 @@ public class MainActivity extends Activity {
     private void releasePlayer() { if (player != null) { player.release(); player = null; } }
     @Override protected void onStop() { super.onStop(); releasePlayer(); }
     @Override public void onBackPressed() {
-        if (player != null) { releasePlayer(); showCategories(currentType); }
+        if (player != null) { releasePlayer(); if (currentType.equals("live")) showItems("live", currentCategory); else showCategories(currentType); }
         else if (!username.isEmpty()) showHome(); else super.onBackPressed();
     }
 }
