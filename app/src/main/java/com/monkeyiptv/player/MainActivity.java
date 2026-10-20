@@ -41,6 +41,7 @@ public class MainActivity extends Activity {
     private static final int UPDATE_INSTALL_REQUEST = 4701;
     private TextView updateInstallStatus;
     private long updateDownloadId = -1;
+    private Uri pendingUpdateApk;
     private BroadcastReceiver updateReceiver;
     private static final String RELEASES_API = "https://api.github.com/repos/muradh47/MonkeyIPTV/releases/latest";
 
@@ -834,40 +835,61 @@ public class MainActivity extends Activity {
                             " is not newer than installed version " + installedCode + ".");
                         return;
                     }
-                    status.setText("APK checked. Waiting for Android installation confirmation...");
+                    status.setText("APK verified. Launching Android installer...");
                     updateInstallStatus = status;
                     Uri apk = androidx.core.content.FileProvider.getUriForFile(
                         MainActivity.this, getPackageName() + ".fileprovider",
                         new java.io.File(getExternalFilesDir(android.os.Environment.DIRECTORY_DOWNLOADS), downloadPath));
-                    Intent install = new Intent(Intent.ACTION_INSTALL_PACKAGE);
-                    install.setData(apk);
-                    install.setClipData(android.content.ClipData.newRawUri("Dream IPTV update", apk));
-                    install.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                    install.putExtra(Intent.EXTRA_RETURN_RESULT, true);
+                    pendingUpdateApk = apk;
                     try {
                         if (Build.VERSION.SDK_INT >= 26 && !getPackageManager().canRequestPackageInstalls()) {
-                            status.setText("Allow Dream IPTV to install updates, then tap INSTALL DOWNLOADED UPDATE.");
+                            status.setText("Enable Allow from this source, then return to Dream IPTV.");
                             Intent settings = new Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
                                 Uri.parse("package:" + getPackageName()));
                             startActivity(settings);
-                            button("INSTALL DOWNLOADED UPDATE", () -> {
-                                if (Build.VERSION.SDK_INT >= 26 && !getPackageManager().canRequestPackageInstalls()) {
-                                    status.setText("Enable Allow from this source in Android settings first.");
-                                    return;
-                                }
-                                startActivityForResult(install, UPDATE_INSTALL_REQUEST);
-                            });
+                            button("INSTALL DOWNLOADED UPDATE", () -> installPendingUpdate(status));
                             return;
                         }
-                        startActivityForResult(install, UPDATE_INSTALL_REQUEST);
+                        installPendingUpdate(status);
+                    } catch (Exception e) {
+                        status.setText("Installer launch failed: " + e.getMessage());
+                        button("RETRY INSTALL", () -> installPendingUpdate(status));
                     }
-                    catch (Exception e) { status.setText("Unable to open installer: " + e.getMessage()); }
                 }
             };
             IntentFilter filter = new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE);
             if (Build.VERSION.SDK_INT >= 33) registerReceiver(updateReceiver, filter, Context.RECEIVER_EXPORTED);
             else registerReceiver(updateReceiver, filter);
         } catch (Exception e) { status.setText("Download failed: " + e.getMessage()); }
+    }
+
+    private void installPendingUpdate(TextView status) {
+        if (pendingUpdateApk == null) {
+            status.setText("No downloaded APK available. Download the update again.");
+            return;
+        }
+        if (Build.VERSION.SDK_INT >= 26 && !getPackageManager().canRequestPackageInstalls()) {
+            status.setText("Allow Dream IPTV to install unknown apps in Android settings first.");
+            return;
+        }
+        Intent install = new Intent(Intent.ACTION_INSTALL_PACKAGE);
+        install.setData(pendingUpdateApk);
+        install.setClipData(android.content.ClipData.newRawUri("Dream IPTV update", pendingUpdateApk));
+        install.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        install.putExtra(Intent.EXTRA_RETURN_RESULT, true);
+        try {
+            for (android.content.pm.ResolveInfo handler : getPackageManager().queryIntentActivities(
+                    install, android.content.pm.PackageManager.MATCH_DEFAULT_ONLY)) {
+                if (handler.activityInfo != null)
+                    grantUriPermission(handler.activityInfo.packageName, pendingUpdateApk,
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            }
+            status.setText("Waiting for Android to install the update...");
+            updateInstallStatus = status;
+            startActivityForResult(install, UPDATE_INSTALL_REQUEST);
+        } catch (Exception e) {
+            status.setText("Android installer error: " + e.getMessage());
+        }
     }
 
     @Override protected void onActivityResult(int requestCode, int resultCode, Intent data) {
