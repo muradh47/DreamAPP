@@ -25,6 +25,9 @@ import java.io.*;
 public class MainActivity extends Activity {
     private LinearLayout root;
     private ExoPlayer player;
+    private final android.os.Handler epgHandler = new android.os.Handler(android.os.Looper.getMainLooper());
+    private Runnable epgRefresh;
+    private int epgRequest = 0;
     private String username, password;
     private String currentType = "live";
     private String currentCategory = "";
@@ -213,40 +216,96 @@ public class MainActivity extends Activity {
     }
 
     private void showEpg(String id, String channel, boolean fromGuide) {
+        releasePlayer();
         screen(channel);
         button("← " + (fromGuide ? "TV Guide" : "Channels"),
-            () -> { if (fromGuide) showGuide(); else showItems("live", currentCategory); });
-        button("▶ WATCH LIVE", () -> play("live", id, "ts"));
+            () -> { releasePlayer(); if (fromGuide) showGuide(); else showCategories("live"); });
+        PlayerView view = new PlayerView(this);
+        root.addView(view, new LinearLayout.LayoutParams(-1, dp(240)));
+        startStream("live", id, "ts", view);
+        TextView playbackStatus = text("Connecting to live stream...");
+        root.addView(playbackStatus);
+        attachPlaybackStatus(playbackStatus, id);
+        root.addView(text("NOW PLAYING"));
+        TextView now = text("Loading programme information...");
+        root.addView(now);
+        root.addView(text("UP NEXT"));
+        TextView next = text("Loading...");
+        root.addView(next);
         root.addView(text("TV PROGRAMME GUIDE"));
-        TextView status = text("Loading programme information...");
-        root.addView(status);
+        LinearLayout schedule = new LinearLayout(this);
+        schedule.setOrientation(LinearLayout.VERTICAL);
+        root.addView(schedule);
+        int request = ++epgRequest;
+        epgRefresh = new Runnable() {
+            @Override public void run() {
+                if (request != epgRequest) return;
+                loadChannelEpg(id, request, now, next, schedule);
+                epgHandler.postDelayed(this, 60000);
+            }
+        };
+        epgHandler.post(epgRefresh);
+    }
+
+    private void loadChannelEpg(String id, int request, TextView now, TextView next, LinearLayout schedule) {
         new Thread(() -> {
             try {
-                JSONObject data = new JSONObject(fetch(api(username, password, "get_short_epg") + "&stream_id=" + enc(id) + "&limit=20"));
+                JSONObject data = new JSONObject(fetch(api(username, password, "get_short_epg")
+                    + "&stream_id=" + enc(id) + "&limit=20"));
                 JSONArray entries = data.optJSONArray("epg_listings");
                 runOnUiThread(() -> {
-                    status.setText(entries == null || entries.length() == 0
-                        ? "No EPG available from the provider for this channel."
-                        : "Programme schedule");
-                    if (entries == null) return;
-                    for (int i = 0; i < entries.length(); i++) {
-                        JSONObject item = entries.optJSONObject(i);
-                        if (item == null) continue;
-                        String title = decodeEpg(item.optString("title", ""));
-                        String desc = decodeEpg(item.optString("description", ""));
-                        String start = item.optString("start", "");
-                        String end = item.optString("end", "");
-                        TextView programme = text(start + " - " + end + "\\n" + title
-                            + (desc.isEmpty() ? "" : "\\n" + desc));
-                        programme.setTextSize(16);
-                        programme.setBackgroundColor(i % 2 == 0 ? Color.rgb(24, 37, 62) : Color.rgb(18, 28, 49));
-                        root.addView(programme);
+                    if (request != epgRequest) return;
+                    schedule.removeAllViews();
+                    long current = System.currentTimeMillis();
+                    JSONObject playing = null, upcoming = null;
+                    if (entries != null) {
+                        for (int i = 0; i < entries.length(); i++) {
+                            JSONObject item = entries.optJSONObject(i);
+                            if (item == null) continue;
+                            long start = epgTime(item.optString("start_timestamp"), item.optString("start"));
+                            long end = epgTime(item.optString("stop_timestamp"), item.optString("end"));
+                            if (start <= current && end > current) playing = item;
+                            if (start > current && (upcoming == null ||
+                                start < epgTime(upcoming.optString("start_timestamp"), upcoming.optString("start"))))
+                                upcoming = item;
+                            TextView programme = text(epgLabel(item));
+                            programme.setTextSize(16);
+                            programme.setBackgroundColor(i % 2 == 0 ? Color.rgb(24, 37, 62) : Color.rgb(18, 28, 49));
+                            schedule.addView(programme);
+                        }
                     }
+                    now.setText(playing == null ? "No current programme information available" : epgLabel(playing));
+                    next.setText(upcoming == null ? "No upcoming programme information available" : epgLabel(upcoming));
                 });
             } catch (Exception ex) {
-                runOnUiThread(() -> status.setText("EPG unavailable: " + ex.getMessage()));
+                runOnUiThread(() -> { if (request == epgRequest) {
+                    now.setText("EPG unavailable: " + ex.getMessage());
+                    next.setText("No upcoming programme information available");
+                }});
             }
         }).start();
+    }
+
+    private long epgTime(String timestamp, String date) {
+        try {
+            if (!timestamp.isEmpty()) {
+                long n = Long.parseLong(timestamp);
+                return n < 100000000000L ? n * 1000L : n;
+            }
+            java.text.SimpleDateFormat format = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US);
+            java.util.Date parsed = format.parse(date);
+            return parsed == null ? -1 : parsed.getTime();
+        } catch (Exception ignored) { return -1; }
+    }
+
+    private String epgLabel(JSONObject item) {
+        String start = item.optString("start", "");
+        String end = item.optString("end", "");
+        String times = start.length() >= 16 && end.length() >= 16
+            ? start.substring(11, 16) + " - " + end.substring(11, 16) : start + " - " + end;
+        String title = decodeEpg(item.optString("title", ""));
+        String description = decodeEpg(item.optString("description", ""));
+        return times + "\n" + title + (description.isEmpty() ? "" : "\n" + description);
     }
 
     private String decodeEpg(String raw) {
@@ -254,8 +313,8 @@ public class MainActivity extends Activity {
         try {
             byte[] bytes = android.util.Base64.decode(raw, android.util.Base64.DEFAULT);
             String decoded = new String(bytes, java.nio.charset.StandardCharsets.UTF_8);
-            return decoded.indexOf((char) 0xFFFD) >= 0 ? raw : decoded;
-        } catch (Exception ignored) { return raw; }
+            return decoded.indexOf((char) 0xFFFD) >= 0 ? raw.replace("\\\\n", "\n") : decoded.replace("\\\\n", "\n");
+        } catch (Exception ignored) { return raw.replace("\\\\n", "\n"); }
     }
 
     private String api(String u, String p, String action) throws Exception {
@@ -513,6 +572,37 @@ public class MainActivity extends Activity {
         player.prepare(); player.play();
     }
 
+    private void startStream(String type, String id, String ext, PlayerView view) {
+        player = new ExoPlayer.Builder(this).build();
+        view.setPlayer(player);
+        String folder = type.equals("vod") ? "movie" : type;
+        String safeExt = ext.matches("[a-zA-Z0-9]{1,5}") ? ext : "mp4";
+        String stream = server + "/" + folder + "/" + path(username) + "/" + path(password) + "/" + path(id) + "." + safeExt;
+        player.setMediaItem(MediaItem.fromUri(stream));
+        player.prepare();
+        player.play();
+    }
+
+    private void attachPlaybackStatus(TextView status, String id) {
+        player.addListener(new Player.Listener() {
+            private boolean retriedHls = false;
+            @Override public void onPlaybackStateChanged(int state) {
+                if (state == Player.STATE_READY) status.setText("");
+                else if (state == Player.STATE_BUFFERING) status.setText("Buffering...");
+            }
+            @Override public void onPlayerError(PlaybackException error) {
+                if (!retriedHls) {
+                    retriedHls = true;
+                    status.setText("Trying HLS stream...");
+                    String hls = server + "/live/" + path(username) + "/" + path(password) + "/" + path(id) + ".m3u8";
+                    player.setMediaItem(MediaItem.fromUri(hls));
+                    player.prepare();
+                    player.play();
+                } else status.setText("Playback failed: " + error.getMessage());
+            }
+        });
+    }
+
     private void checkUpdates() {
         root.addView(text("Checking GitHub Releases..."));
         new Thread(() -> {
@@ -546,7 +636,7 @@ public class MainActivity extends Activity {
         } finally { c.disconnect(); }
     }
 
-    private void releasePlayer() { if (player != null) { player.release(); player = null; } }
+    private void releasePlayer() { ++epgRequest; if (epgRefresh != null) { epgHandler.removeCallbacks(epgRefresh); epgRefresh = null; } if (player != null) { player.release(); player = null; } }
     @Override protected void onStop() { super.onStop(); releasePlayer(); }
     @Override public void onBackPressed() {
         if (player != null) { releasePlayer(); if (currentType.equals("live")) showItems("live", currentCategory); else showCategories(currentType); }
