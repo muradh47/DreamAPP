@@ -121,14 +121,17 @@ public class MainActivity extends Activity {
 
         EditText user = loginField("Username", false);
         android.content.SharedPreferences prefs = getPreferences(0);
-        boolean rememberEnabled = prefs.getBoolean("remember_username", false);
-        if (rememberEnabled) user.setText(prefs.getString("saved_username", ""));
+        boolean rememberEnabled = prefs.getBoolean("remember_login", false);
+        if (rememberEnabled) {
+            user.setText(prefs.getString("saved_username", ""));
+        }
         CheckBox remember = new CheckBox(this);
-        remember.setText("Remember username");
+        remember.setText("Remember username and password");
         remember.setTextColor(Color.WHITE);
         remember.setChecked(rememberEnabled);
         root.addView(remember);
         EditText pass = loginField("Password", true);
+        if (rememberEnabled) pass.setText(prefs.getString("saved_password", ""));
         TextView status = text("");
         status.setGravity(Gravity.CENTER);
         root.addView(status);
@@ -146,9 +149,9 @@ public class MainActivity extends Activity {
                     boolean saveUsername = remember.isChecked();
                     android.content.SharedPreferences.Editor editor = getPreferences(0).edit()
                         .putString("username", u).putString("password", p)
-                        .putBoolean("remember_username", saveUsername);
-                    if (saveUsername) editor.putString("saved_username", u);
-                    else editor.remove("saved_username");
+                        .putBoolean("remember_login", saveUsername);
+                    if (saveUsername) editor.putString("saved_username", u).putString("saved_password", p);
+                    else editor.remove("saved_username").remove("saved_password");
                     editor.apply();
                     runOnUiThread(this::showHome);
                 } catch (Exception ex) { runOnUiThread(() -> status.setText("Login failed: " + ex.getMessage())); }
@@ -480,8 +483,10 @@ public class MainActivity extends Activity {
             if (id.isEmpty()) continue;
             String name = item.optString("name", "Untitled");
             String ext = item.optString("container_extension", "mp4");
-            // Keep logos disabled until a bounded image loader is added.
-            channelCard(name, "", currentBrowseType, id, ext);
+            String logo = currentBrowseType.equals("live") ? item.optString("stream_icon") :
+                currentBrowseType.equals("vod") ? item.optString("stream_icon", item.optString("cover")) :
+                item.optString("cover", item.optString("stream_icon"));
+            channelCard(name, logo, currentBrowseType, id, ext, item);
         }
         nextItemIndex = end;
         if (nextItemIndex < currentItems.length()) {
@@ -501,7 +506,7 @@ public class MainActivity extends Activity {
 
     private Button loadMoreButton;
 
-    private void channelCard(String name, String logo, String type, String id, String ext) {
+    private void channelCard(String name, String logo, String type, String id, String ext, JSONObject metadata) {
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
         card.setBackgroundColor(Color.rgb(29, 36, 52));
@@ -517,16 +522,67 @@ public class MainActivity extends Activity {
         image.setScaleType(ImageView.ScaleType.FIT_CENTER);
         image.setPadding(dp(8), dp(8), dp(8), dp(8));
         card.addView(image, new LinearLayout.LayoutParams(-1, dp(105)));
+        loadArtwork(logo, image);
         TextView label = text(name);
         label.setTextSize(14);
         label.setMaxLines(2);
         label.setGravity(Gravity.CENTER);
-        card.addView(label, new LinearLayout.LayoutParams(-1, dp(56)));
+        card.addView(label, new LinearLayout.LayoutParams(-1, dp(45)));
+        if (!type.equals("live")) {
+            String rating = metadata.optString("rating_5based", metadata.optString("rating", ""));
+            String year = metadata.optString("releaseDate", metadata.optString("release_date", ""));
+            String imdb = metadata.optString("imdb_id", "");
+            String details = (year.length() >= 4 ? year.substring(0, 4) : "") +
+                (!rating.isEmpty() ? "  ★ " + rating : "") +
+                (!imdb.isEmpty() ? "  IMDb" : "");
+            if (!details.trim().isEmpty()) {
+                TextView info = text(details.trim());
+                info.setTextSize(11);
+                info.setTextColor(Color.LTGRAY);
+                info.setGravity(Gravity.CENTER);
+                info.setSingleLine(true);
+                card.addView(info, new LinearLayout.LayoutParams(-1, dp(18)));
+            }
+        }
         GridLayout.LayoutParams gp = new GridLayout.LayoutParams();
         gp.width = dp(155); gp.height = dp(170);
         gp.setMargins(dp(6), dp(6), dp(6), dp(6));
         contentGrid.addView(card, gp);
 
+    }
+
+    private final java.util.concurrent.ExecutorService artworkExecutor =
+        java.util.concurrent.Executors.newFixedThreadPool(4);
+    private final android.util.LruCache<String, Bitmap> artworkCache =
+        new android.util.LruCache<String, Bitmap>(48) {
+            @Override protected int sizeOf(String key, Bitmap bitmap) {
+                return Math.max(1, bitmap.getByteCount() / 1024 / 1024);
+            }
+        };
+
+    private void loadArtwork(String url, ImageView target) {
+        if (url == null || !url.startsWith("https://") && !url.startsWith("http://")) return;
+        target.setTag(url);
+        Bitmap cached = artworkCache.get(url);
+        if (cached != null) { target.setImageBitmap(cached); return; }
+        artworkExecutor.execute(() -> {
+            try {
+                HttpURLConnection connection = (HttpURLConnection) new java.net.URL(url).openConnection();
+                connection.setConnectTimeout(5000);
+                connection.setReadTimeout(7000);
+                connection.setInstanceFollowRedirects(true);
+                try (InputStream input = connection.getInputStream()) {
+                    BitmapFactory.Options options = new BitmapFactory.Options();
+                    options.inSampleSize = 2;
+                    Bitmap bitmap = BitmapFactory.decodeStream(input, null, options);
+                    if (bitmap == null) return;
+                    artworkCache.put(url, bitmap);
+                    runOnUiThread(() -> {
+                        if (url.equals(target.getTag())) target.setImageBitmap(bitmap);
+                    });
+                } finally { connection.disconnect(); }
+            } catch (Exception ignored) { }
+        });
     }
 
     private void showEpisodes(String seriesId, String name) {
@@ -679,7 +735,8 @@ public class MainActivity extends Activity {
             request.setTitle("Dream IPTV update");
             request.setDescription("Downloading new version");
             request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
-            request.setDestinationInExternalFilesDir(this, android.os.Environment.DIRECTORY_DOWNLOADS, "dream-iptv-update.apk");
+            final String downloadPath = "dream-iptv-update-" + System.currentTimeMillis() + ".apk";
+            request.setDestinationInExternalFilesDir(this, android.os.Environment.DIRECTORY_DOWNLOADS, downloadPath);
             updateDownloadId = manager.enqueue(request);
             status.setText("Downloading update...");
             if (updateReceiver != null) unregisterReceiver(updateReceiver);
@@ -692,19 +749,60 @@ public class MainActivity extends Activity {
                         int state = cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS));
                         if (state != DownloadManager.STATUS_SUCCESSFUL) { status.setText("Update download failed"); return; }
                     }
-                    status.setText("Download complete. Confirm installation in Android.");
+                    java.io.File downloadedApk = new java.io.File(
+                        getExternalFilesDir(android.os.Environment.DIRECTORY_DOWNLOADS), downloadPath);
+                    if (!downloadedApk.isFile() || downloadedApk.length() < 10240) {
+                        status.setText("Update failed: downloaded file is missing or too small.");
+                        return;
+                    }
+                    android.content.pm.PackageInfo archive = getPackageManager()
+                        .getPackageArchiveInfo(downloadedApk.getAbsolutePath(), 0);
+                    if (archive == null) {
+                        status.setText("Update failed: downloaded file is not a valid Android APK.");
+                        return;
+                    }
+                    if (!getPackageName().equals(archive.packageName)) {
+                        status.setText("Update rejected: APK belongs to a different app (" + archive.packageName + ").");
+                        return;
+                    }
+                    long newCode = Build.VERSION.SDK_INT >= 28 ? archive.getLongVersionCode() : archive.versionCode;
+                    long installedCode = BuildConfig.VERSION_CODE;
+                    if (newCode <= installedCode) {
+                        status.setText("Update rejected: APK version " + newCode +
+                            " is not newer than installed version " + installedCode + ".");
+                        return;
+                    }
+                    status.setText("Download verified. Opening Android installer...");
                     Uri apk = androidx.core.content.FileProvider.getUriForFile(
                         MainActivity.this, getPackageName() + ".fileprovider",
-                        new java.io.File(getExternalFilesDir(android.os.Environment.DIRECTORY_DOWNLOADS), "dream-iptv-update.apk"));
-                    Intent install = new Intent(Intent.ACTION_VIEW);
-                    install.setDataAndType(apk, "application/vnd.android.package-archive");
-                    install.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
-                    try { startActivity(install); }
+                        new java.io.File(getExternalFilesDir(android.os.Environment.DIRECTORY_DOWNLOADS), downloadPath));
+                    Intent install = new Intent(Intent.ACTION_INSTALL_PACKAGE);
+                    install.setData(apk);
+                    install.setClipData(android.content.ClipData.newRawUri("Dream IPTV update", apk));
+                    install.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                    install.putExtra(Intent.EXTRA_RETURN_RESULT, true);
+                    try {
+                        if (Build.VERSION.SDK_INT >= 26 && !getPackageManager().canRequestPackageInstalls()) {
+                            status.setText("Allow Dream IPTV to install updates, then tap INSTALL DOWNLOADED UPDATE.");
+                            Intent settings = new Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                                Uri.parse("package:" + getPackageName()));
+                            startActivity(settings);
+                            button("INSTALL DOWNLOADED UPDATE", () -> {
+                                if (Build.VERSION.SDK_INT >= 26 && !getPackageManager().canRequestPackageInstalls()) {
+                                    status.setText("Enable Allow from this source in Android settings first.");
+                                    return;
+                                }
+                                startActivity(install);
+                            });
+                            return;
+                        }
+                        startActivity(install);
+                    }
                     catch (Exception e) { status.setText("Unable to open installer: " + e.getMessage()); }
                 }
             };
             IntentFilter filter = new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE);
-            if (Build.VERSION.SDK_INT >= 33) registerReceiver(updateReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+            if (Build.VERSION.SDK_INT >= 33) registerReceiver(updateReceiver, filter, Context.RECEIVER_EXPORTED);
             else registerReceiver(updateReceiver, filter);
         } catch (Exception e) { status.setText("Download failed: " + e.getMessage()); }
     }
