@@ -259,22 +259,60 @@ public class MainActivity extends Activity {
         fullscreen.setBackgroundColor(Color.BLACK);
         setContentView(fullscreen);
         PlayerView fullscreenView = new PlayerView(this);
-        fullscreenView.setUseController(true);
-        fullscreenView.setControllerShowTimeoutMs(3500);
+        fullscreenView.setUseController(false);
         fullscreenView.setResizeMode(androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT);
         fullscreen.addView(fullscreenView, new android.widget.FrameLayout.LayoutParams(-1, -1));
+
+        LinearLayout overlay = new LinearLayout(this);
+        overlay.setOrientation(LinearLayout.VERTICAL);
+        overlay.setPadding(dp(18), dp(12), dp(18), dp(12));
+        overlay.setBackgroundColor(Color.argb(225, 12, 21, 37));
+        android.widget.FrameLayout.LayoutParams overlayParams = new android.widget.FrameLayout.LayoutParams(
+            -1, -2, Gravity.BOTTOM);
+        fullscreen.addView(overlay, overlayParams);
+        TextView title = text(channel + "   •   TV GUIDE");
+        title.setTextSize(19);
+        title.setTextColor(Color.WHITE);
+        overlay.addView(title);
+        TextView now = text("NOW  •  Loading programme information...");
+        overlay.addView(now);
+        TextView next = text("NEXT  •  Loading...");
+        overlay.addView(next);
+        android.widget.ScrollView scroll = new android.widget.ScrollView(this);
+        LinearLayout schedule = new LinearLayout(this);
+        schedule.setOrientation(LinearLayout.VERTICAL);
+        scroll.addView(schedule);
+        overlay.addView(scroll, new LinearLayout.LayoutParams(-1, dp(115)));
+        overlay.setVisibility(View.GONE);
+
+        android.view.View tapArea = new android.view.View(this);
+        tapArea.setClickable(true);
+        fullscreen.addView(tapArea, new android.widget.FrameLayout.LayoutParams(-1, -1));
+        tapArea.setOnClickListener(v -> overlay.setVisibility(
+            overlay.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE));
+        overlay.setOnClickListener(v -> overlay.setVisibility(View.GONE));
+        overlay.setClickable(true);
         Button back = new Button(this);
-        back.setText("← GUIDE");
+        back.setText("← " + (fromGuide ? "GUIDE" : "CHANNELS"));
         android.widget.FrameLayout.LayoutParams backParams = new android.widget.FrameLayout.LayoutParams(
-            dp(130), dp(48), Gravity.TOP | Gravity.START);
+            dp(145), dp(48), Gravity.TOP | Gravity.START);
         backParams.setMargins(dp(12), dp(12), 0, 0);
         fullscreen.addView(back, backParams);
         back.setOnClickListener(v -> {
             releasePlayer();
-            setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
             getWindow().getDecorView().setSystemUiVisibility(0);
             if (fromGuide) showGuide(); else showCategories("live");
         });
+
+        int request = ++epgRequest;
+        epgRefresh = new Runnable() {
+            @Override public void run() {
+                if (request != epgRequest) return;
+                loadChannelEpg(id, request, now, next, schedule);
+                epgHandler.postDelayed(this, 60000);
+            }
+        };
+        epgHandler.post(epgRefresh);
         startStream("live", id, "ts", fullscreenView);
     }
 
