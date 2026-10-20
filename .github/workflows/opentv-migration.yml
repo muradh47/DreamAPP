@@ -56,6 +56,74 @@ jobs:
           t = t[:start] + '            Text("Dream IPTV · Secure login", style = MaterialTheme.typography.titleMedium)\\n            Spacer(Modifier.height(20.dp))\\n\\n' + t[end:]
           t = t.replace('url = url,', 'url = "http://tvplug.xyz:8880",')
           onboarding.write_text(t)
+          # Preserve the original Dream IPTV home tile layout; OpenTV owns the other screens.
+          main = Path("app/src/main/java/app/opentv/MainActivity.kt")
+          t = main.read_text()
+          t = t.replace('    const val HOME = "home"', '    const val HOME = "home"\\n    const val BROWSE = "browse"')
+          marker = '            composable(Routes.HOME) {\\n                MainScreen('
+          if marker not in t:
+              raise RuntimeError("OpenTV navigation layout changed")
+          t = t.replace(marker, '''            composable(Routes.HOME) {
+                DreamHomeScreen(
+                    onBrowse = { navController.navigate(Routes.BROWSE) },
+                    onGuide = { navController.navigate(Routes.BROWSE) },
+                    onUpdates = { navController.navigate(Routes.ABOUT) },
+                    onLogout = { navController.navigate(Routes.PROVIDERS) },
+                )
+            }
+            composable(Routes.BROWSE) {
+                MainScreen(''', 1)
+          t += """
+@Composable
+private fun DreamHomeScreen(
+    onBrowse: () -> Unit,
+    onGuide: () -> Unit,
+    onUpdates: () -> Unit,
+    onLogout: () -> Unit,
+) {
+    androidx.compose.foundation.layout.Column(
+        modifier = Modifier.fillMaxSize().background(Color(0xFF101827)).padding(20.dp),
+    ) {
+        Text("DREAM IPTV", style = MaterialTheme.typography.headlineMedium, color = Color.White)
+        Text("Your entertainment, your way", color = Color.LightGray)
+        Spacer(Modifier.size(16.dp))
+        Row(Modifier.weight(1f)) {
+            DreamTile("▣\\nLIVE TV", Color(0xFF0094B5), Modifier.weight(1f).fillMaxSize(), onBrowse)
+            androidx.compose.foundation.layout.Column(Modifier.weight(2f)) {
+                Row(Modifier.weight(1f)) {
+                    DreamTile("▶\\nMOVIES", Color(0xFFDD4E27), Modifier.weight(1f).fillMaxSize(), onBrowse)
+                    DreamTile("▤\\nSERIES", Color(0xFF704DBB), Modifier.weight(1f).fillMaxSize(), onBrowse)
+                }
+                Row(Modifier.weight(0.6f)) {
+                    DreamTile("TV GUIDE", Color(0xFF25866D), Modifier.weight(1f).fillMaxSize(), onGuide)
+                    DreamTile("CATCH UP", Color(0xFF247861), Modifier.weight(1f).fillMaxSize(), onBrowse)
+                }
+            }
+        }
+        Row(Modifier.fillMaxSize().weight(0.28f)) {
+            DreamTile("CHECK UPDATES", Color(0xFF263959), Modifier.weight(1f).fillMaxSize(), onUpdates)
+            DreamTile("LOG OUT", Color(0xFF263959), Modifier.weight(1f).fillMaxSize(), onLogout)
+        }
+    }
+}
+
+@Composable
+private fun DreamTile(
+    label: String,
+    color: Color,
+    modifier: Modifier,
+    onClick: () -> Unit,
+) {
+    Box(
+        modifier = modifier.padding(4.dp).clip(RoundedCornerShape(12.dp))
+            .background(color).clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(label, color = Color.White, style = MaterialTheme.typography.titleLarge)
+    }
+}
+"""
+          main.write_text(t)
           PY
           echo "KEYSTORE_PATH=$RUNNER_TEMP/dream.keystore" >> "$GITHUB_ENV"
           echo "KEYSTORE_PASSWORD=$STORE_PASSWORD" >> "$GITHUB_ENV"
