@@ -3,6 +3,12 @@ package com.monkeyiptv.player;
 import android.app.Activity;
 import android.os.Bundle;
 import android.content.Intent;
+import android.app.DownloadManager;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.IntentFilter;
+import android.os.Build;
+import android.database.Cursor;
 import android.net.Uri;
 import android.graphics.Color;
 import android.widget.*;
@@ -32,6 +38,8 @@ public class MainActivity extends Activity {
     private String currentType = "live";
     private String currentCategory = "";
     private String server = BuildConfig.SERVER_URL.replaceAll("/$", "");
+    private long updateDownloadId = -1;
+    private BroadcastReceiver updateReceiver;
     private static final String RELEASES_API = "https://api.github.com/repos/muradh47/MonkeyIPTV/releases/latest";
 
     @Override public void onCreate(Bundle state) {
@@ -112,6 +120,14 @@ public class MainActivity extends Activity {
         root.addView(subtitle);
 
         EditText user = loginField("Username", false);
+        android.content.SharedPreferences prefs = getPreferences(0);
+        boolean rememberEnabled = prefs.getBoolean("remember_username", false);
+        if (rememberEnabled) user.setText(prefs.getString("saved_username", ""));
+        CheckBox remember = new CheckBox(this);
+        remember.setText("Remember username");
+        remember.setTextColor(Color.WHITE);
+        remember.setChecked(rememberEnabled);
+        root.addView(remember);
         EditText pass = loginField("Password", true);
         TextView status = text("");
         status.setGravity(Gravity.CENTER);
@@ -127,7 +143,13 @@ public class MainActivity extends Activity {
                     if (info == null || !"Active".equalsIgnoreCase(info.optString("status")))
                         throw new IOException("Login failed or account inactive");
                     username = u; password = p;
-                    getPreferences(0).edit().putString("username", u).putString("password", p).apply();
+                    boolean saveUsername = remember.isChecked();
+                    android.content.SharedPreferences.Editor editor = getPreferences(0).edit()
+                        .putString("username", u).putString("password", p)
+                        .putBoolean("remember_username", saveUsername);
+                    if (saveUsername) editor.putString("saved_username", u);
+                    else editor.remove("saved_username");
+                    editor.apply();
                     runOnUiThread(this::showHome);
                 } catch (Exception ex) { runOnUiThread(() -> status.setText("Login failed: " + ex.getMessage())); }
             }).start();
@@ -179,7 +201,7 @@ public class MainActivity extends Activity {
         LinearLayout tools = row();
         addTile(tools, "CHECK UPDATES", Color.rgb(38, 57, 89), 88, this::checkUpdates);
         addTile(tools, "LOG OUT", Color.rgb(38, 57, 89), 88, () -> {
-            getPreferences(0).edit().clear().apply();
+            getPreferences(0).edit().remove("username").remove("password").apply();
             username = ""; password = ""; showLogin();
         });
     }
@@ -604,19 +626,87 @@ public class MainActivity extends Activity {
     }
 
     private void checkUpdates() {
-        root.addView(text("Checking GitHub Releases..."));
+        TextView status = text("Checking for updates...");
+        root.addView(status);
         new Thread(() -> {
             try {
                 JSONObject release = new JSONObject(fetchAbsolute(RELEASES_API));
-                String tag = release.optString("tag_name", "");
-                String link = release.optString("html_url", "");
+                String tag = release.optString("tag_name", "").replaceFirst("^[vV]", "");
+                JSONArray assets = release.optJSONArray("assets");
+                String apkUrl = "";
+                if (assets != null) for (int i = 0; i < assets.length(); i++) {
+                    JSONObject asset = assets.optJSONObject(i);
+                    if (asset != null && asset.optString("name").endsWith(".apk")) {
+                        apkUrl = asset.optString("browser_download_url"); break;
+                    }
+                }
+                final String url = apkUrl;
                 runOnUiThread(() -> {
-                    if (tag.isEmpty() || link.isEmpty()) { root.addView(text("No published release found.")); return; }
-                    root.addView(text("Latest release: " + tag + " • Installed: " + BuildConfig.VERSION_NAME));
-                    button("Open release download page", () -> startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(link))));
+                    if (tag.isEmpty()) { status.setText("No published release found."); return; }
+                    if (compareVersions(tag, BuildConfig.VERSION_NAME) <= 0) {
+                        status.setText("Up to date (" + BuildConfig.VERSION_NAME + ")"); return;
+                    }
+                    if (url.isEmpty()) {
+                        status.setText("Version " + tag + " is available, but no APK is attached to its GitHub Release.");
+                        return;
+                    }
+                    status.setText("New version " + tag + " available (installed: " + BuildConfig.VERSION_NAME + ")");
+                    button("DOWNLOAD UPDATE", () -> downloadUpdate(url, status));
                 });
-            } catch (Exception e) { runOnUiThread(() -> root.addView(text("Could not check releases: " + e.getMessage()))); }
+            } catch (Exception e) { runOnUiThread(() -> status.setText("Update check failed: " + e.getMessage())); }
         }).start();
+    }
+
+    private int compareVersions(String a, String b) {
+        String[] x = a.split("[.-]"), y = b.split("[.-]");
+        for (int i = 0; i < Math.max(x.length, y.length); i++) {
+            int n = i < x.length ? versionPart(x[i]) : 0;
+            int m = i < y.length ? versionPart(y[i]) : 0;
+            if (n != m) return Integer.compare(n, m);
+        }
+        return 0;
+    }
+
+    private int versionPart(String s) {
+        try { return Integer.parseInt(s); } catch (NumberFormatException ignored) { return 0; }
+    }
+
+    private void downloadUpdate(String url, TextView status) {
+        try {
+            if (!url.startsWith("https://github.com/")) throw new IOException("Unexpected update URL");
+            DownloadManager manager = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
+            DownloadManager.Request request = new DownloadManager.Request(Uri.parse(url));
+            request.setTitle("Dream IPTV update");
+            request.setDescription("Downloading new version");
+            request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+            request.setDestinationInExternalFilesDir(this, android.os.Environment.DIRECTORY_DOWNLOADS, "dream-iptv-update.apk");
+            updateDownloadId = manager.enqueue(request);
+            status.setText("Downloading update...");
+            if (updateReceiver != null) unregisterReceiver(updateReceiver);
+            updateReceiver = new BroadcastReceiver() {
+                @Override public void onReceive(Context context, Intent intent) {
+                    if (intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1) != updateDownloadId) return;
+                    DownloadManager.Query query = new DownloadManager.Query().setFilterById(updateDownloadId);
+                    try (Cursor cursor = manager.query(query)) {
+                        if (cursor == null || !cursor.moveToFirst()) { status.setText("Update download missing"); return; }
+                        int state = cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS));
+                        if (state != DownloadManager.STATUS_SUCCESSFUL) { status.setText("Update download failed"); return; }
+                    }
+                    status.setText("Download complete. Confirm installation in Android.");
+                    Uri apk = androidx.core.content.FileProvider.getUriForFile(
+                        MainActivity.this, getPackageName() + ".fileprovider",
+                        new java.io.File(getExternalFilesDir(android.os.Environment.DIRECTORY_DOWNLOADS), "dream-iptv-update.apk"));
+                    Intent install = new Intent(Intent.ACTION_VIEW);
+                    install.setDataAndType(apk, "application/vnd.android.package-archive");
+                    install.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
+                    try { startActivity(install); }
+                    catch (Exception e) { status.setText("Unable to open installer: " + e.getMessage()); }
+                }
+            };
+            IntentFilter filter = new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE);
+            if (Build.VERSION.SDK_INT >= 33) registerReceiver(updateReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+            else registerReceiver(updateReceiver, filter);
+        } catch (Exception e) { status.setText("Download failed: " + e.getMessage()); }
     }
 
     private static String enc(String value) throws Exception { return URLEncoder.encode(value, "UTF-8"); }
@@ -637,6 +727,7 @@ public class MainActivity extends Activity {
     }
 
     private void releasePlayer() { ++epgRequest; if (epgRefresh != null) { epgHandler.removeCallbacks(epgRefresh); epgRefresh = null; } if (player != null) { player.release(); player = null; } }
+    @Override protected void onDestroy() { if (updateReceiver != null) { unregisterReceiver(updateReceiver); updateReceiver = null; } super.onDestroy(); }
     @Override protected void onStop() { super.onStop(); releasePlayer(); }
     @Override public void onBackPressed() {
         if (player != null) { releasePlayer(); if (currentType.equals("live")) showItems("live", currentCategory); else showCategories(currentType); }
