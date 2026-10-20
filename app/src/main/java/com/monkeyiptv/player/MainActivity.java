@@ -749,7 +749,30 @@ public class MainActivity extends Activity {
                         int state = cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS));
                         if (state != DownloadManager.STATUS_SUCCESSFUL) { status.setText("Update download failed"); return; }
                     }
-                    status.setText("Download complete. Opening Android installer...");
+                    java.io.File downloadedApk = new java.io.File(
+                        getExternalFilesDir(android.os.Environment.DIRECTORY_DOWNLOADS), downloadPath);
+                    if (!downloadedApk.isFile() || downloadedApk.length() < 10240) {
+                        status.setText("Update failed: downloaded file is missing or too small.");
+                        return;
+                    }
+                    android.content.pm.PackageInfo archive = getPackageManager()
+                        .getPackageArchiveInfo(downloadedApk.getAbsolutePath(), 0);
+                    if (archive == null) {
+                        status.setText("Update failed: downloaded file is not a valid Android APK.");
+                        return;
+                    }
+                    if (!getPackageName().equals(archive.packageName)) {
+                        status.setText("Update rejected: APK belongs to a different app (" + archive.packageName + ").");
+                        return;
+                    }
+                    long newCode = Build.VERSION.SDK_INT >= 28 ? archive.getLongVersionCode() : archive.versionCode;
+                    long installedCode = BuildConfig.VERSION_CODE;
+                    if (newCode <= installedCode) {
+                        status.setText("Update rejected: APK version " + newCode +
+                            " is not newer than installed version " + installedCode + ".");
+                        return;
+                    }
+                    status.setText("Download verified. Opening Android installer...");
                     Uri apk = androidx.core.content.FileProvider.getUriForFile(
                         MainActivity.this, getPackageName() + ".fileprovider",
                         new java.io.File(getExternalFilesDir(android.os.Environment.DIRECTORY_DOWNLOADS), downloadPath));
