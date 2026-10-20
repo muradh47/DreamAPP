@@ -130,6 +130,37 @@ jobs:
           t = t.replace('DreamTile("▶\\nMOVIES"', 'DreamTile("▶\\\\nMOVIES"')
           t = t.replace('DreamTile("▤\\nSERIES"', 'DreamTile("▤\\\\nSERIES"')
           main.write_text(t)
+          # Dream IPTV visual system applied across all OpenTV screens.
+          theme = Path("app/src/main/java/app/opentv/ui/theme/Theme.kt")
+          palette = theme.read_text()
+          replacements = {
+              "0xFF7C93FF": "0xFF00C8E8",
+              "0xFF4B5DB8": "0xFF006E88",
+              "0xFF9AA3C0": "0xFFFFB86C",
+              "0xFF07080C": "0xFF0B1220",
+              "0xFF0D0F16": "0xFF121E30",
+              "0xFF171A24": "0xFF1B2B42",
+              "0xFF2A2F3D": "0xFF334962",
+              "0xFFE8EAF0": "0xFFF5F8FF",
+              "0xFFA8AEC0": "0xFFB3C5DA",
+              "0xFF3B4FCC": "0xFF008FAF",
+              "0xFFFBFBFE": "0xFFEAF4FA",
+              "0xFFEEF0F6": "0xFFD9E9F3",
+              "fontSize = 34.sp": "fontSize = 38.sp",
+              "fontSize = 26.sp": "fontSize = 30.sp",
+              "fontSize = 22.sp": "fontSize = 25.sp",
+              "fontSize = 20.sp": "fontSize = 23.sp",
+              "fontSize = 17.sp": "fontSize = 19.sp",
+          }
+          for old, new in replacements.items():
+              palette = palette.replace(old, new)
+          theme.write_text(palette)
+          # Bigger navigation rail for comfortable D-pad and TV use.
+          shell = Path("app/src/main/java/app/opentv/ui/MainScreen.kt")
+          shell_text = shell.read_text()
+          shell_text = shell_text.replace("private val RAIL_COLLAPSED = 76.dp", "private val RAIL_COLLAPSED = 88.dp")
+          shell_text = shell_text.replace("private val RAIL_EXPANDED = 236.dp", "private val RAIL_EXPANDED = 260.dp")
+          shell.write_text(shell_text)
           PY
           echo "KEYSTORE_PATH=$RUNNER_TEMP/dream.keystore" >> "$GITHUB_ENV"
           echo "KEYSTORE_PASSWORD=$STORE_PASSWORD" >> "$GITHUB_ENV"
