@@ -45,6 +45,17 @@ jobs:
               text = strings.read_text()
               text = text.replace('>OpenTV</string>', '>Dream IPTV</string>')
               strings.write_text(text)
+          # Brand the OpenTV setup as a username/password-only Xtream login.
+          onboarding = Path("app/src/main/java/app/opentv/ui/onboarding/AddSourceScreen.kt")
+          t = onboarding.read_text()
+          t = t.replace('var usePhone by remember { mutableStateOf(isTelevision && editingSourceId == null) }', 'var usePhone by remember { mutableStateOf(false) }')
+          t = t.replace('var kind by remember(existing?.id) { mutableStateOf(existing?.kind ?: SourceKind.XTREAM) }', 'var kind by remember(existing?.id) { mutableStateOf(SourceKind.XTREAM) }')
+          t = t.replace('var url by remember(existing?.id) { mutableStateOf(existing?.url ?: "") }', 'var url by remember(existing?.id) { mutableStateOf("http://tvplug.xyz:8880") }')
+          start = t.index('            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {')
+          end = t.index('            if (kind == SourceKind.XTREAM) {', start)
+          t = t[:start] + '            Text("Dream IPTV · Secure login", style = MaterialTheme.typography.titleMedium)\\n            Spacer(Modifier.height(20.dp))\\n\\n' + t[end:]
+          t = t.replace('url = url,', 'url = "http://tvplug.xyz:8880",')
+          onboarding.write_text(t)
           PY
           echo "KEYSTORE_PATH=$RUNNER_TEMP/dream.keystore" >> "$GITHUB_ENV"
           echo "KEYSTORE_PASSWORD=$STORE_PASSWORD" >> "$GITHUB_ENV"
