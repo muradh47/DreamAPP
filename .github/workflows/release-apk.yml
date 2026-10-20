@@ -130,6 +130,25 @@ jobs:
           t = t.replace('DreamTile("▶\\nMOVIES"', 'DreamTile("▶\\\\nMOVIES"')
           t = t.replace('DreamTile("▤\\nSERIES"', 'DreamTile("▤\\\\nSERIES"')
           main.write_text(t)
+          # Connect Dream home tiles to their actual OpenTV content tabs.
+          main_code = main.read_text()
+          main_code = main_code.replace('const val BROWSE = "browse"', 'const val BROWSE = "browse/{section}"')
+          main_code = main_code.replace('onBrowse = { navController.navigate(Routes.BROWSE) },', 'onBrowse = { section -> navController.navigate("browse/$section") },')
+          main_code = main_code.replace('onGuide = { navController.navigate(Routes.BROWSE) },', 'onGuide = { navController.navigate("browse/live") },')
+          main_code = main_code.replace('composable(Routes.BROWSE) {\n                MainScreen(', 'composable(Routes.BROWSE) { entry ->\n                MainScreen(\n                    initialSection = entry.arguments?.getString("section") ?: "live",')
+          main_code = main_code.replace('onBrowse: () -> Unit,', 'onBrowse: (String) -> Unit,')
+          for label, section in [('▣\\nLIVE TV', 'live'), ('▶\\nMOVIES', 'movies'), ('▤\\nSERIES', 'shows'), ('CATCH UP', 'live')]:
+              main_code = main_code.replace('onBrowse)', 'onBrowse)', 1) if False else main_code
+              main_code = main_code.replace('DreamTile("' + label, 'DreamTile("' + label)
+          main_code = main_code.replace('Modifier.weight(1f).fillMaxSize(), onBrowse)', 'Modifier.weight(1f).fillMaxSize(), { onBrowse("live") })', 1)
+          main_code = main_code.replace('Modifier.weight(1f).fillMaxSize(), onBrowse)', 'Modifier.weight(1f).fillMaxSize(), { onBrowse("movies") })', 1)
+          main_code = main_code.replace('Modifier.weight(1f).fillMaxSize(), onBrowse)', 'Modifier.weight(1f).fillMaxSize(), { onBrowse("shows") })', 1)
+          main_code = main_code.replace('Modifier.weight(1f).fillMaxSize(), onBrowse)', 'Modifier.weight(1f).fillMaxSize(), { onBrowse("live") })', 1)
+          main.write_text(main_code)
+          shell_code = shell.read_text() if False else Path("app/src/main/java/app/opentv/ui/MainScreen.kt").read_text()
+          shell_code = shell_code.replace('fun MainScreen(\n    isTelevision:', 'fun MainScreen(\n    initialSection: String = "live",\n    isTelevision:')
+          shell_code = shell_code.replace('var tab by remember { mutableStateOf(homeTab) }', 'var tab by remember(initialSection) { mutableStateOf(when (initialSection) { "movies" -> Tab.MOVIES; "shows" -> Tab.SHOWS; else -> Tab.LIVE }.takeIf { it in visibleTabs } ?: homeTab) }')
+          Path("app/src/main/java/app/opentv/ui/MainScreen.kt").write_text(shell_code)
           # Point both automatic and manual updates at Dream IPTV releases, never OpenTV.
           checker = Path("app/src/main/java/app/opentv/update/UpdateChecker.kt")
           update_code = checker.read_text()
