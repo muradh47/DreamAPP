@@ -43,6 +43,7 @@ public class MainActivity extends Activity {
     private long updateDownloadId = -1;
     private Uri pendingUpdateApk;
     private BroadcastReceiver updateReceiver;
+    private boolean updateCheckedThisSession = false;
     private static final String RELEASES_API = "https://api.github.com/repos/muradh47/MonkeyIPTV/releases/latest";
 
     @Override public void onCreate(Bundle state) {
@@ -210,6 +211,10 @@ public class MainActivity extends Activity {
             getPreferences(0).edit().remove("username").remove("password").apply();
             username = ""; password = ""; showLogin();
         });
+        if (!updateCheckedThisSession) {
+            updateCheckedThisSession = true;
+            checkUpdates();
+        }
     }
 
     private void showGuide() {
