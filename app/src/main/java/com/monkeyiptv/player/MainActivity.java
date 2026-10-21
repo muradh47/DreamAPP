@@ -190,44 +190,58 @@ public class MainActivity extends Activity {
 
     private void showHome() {
         releasePlayer();
-        setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
+        setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
         getWindow().getDecorView().setSystemUiVisibility(0);
         screen("DREAM IPTV");
-        root.setPadding(dp(28), dp(12), dp(28), dp(20));
+        root.setPadding(dp(22), dp(10), dp(22), dp(18));
         root.setGravity(Gravity.CENTER_VERTICAL);
         root.setBackground(new GradientDrawable(GradientDrawable.Orientation.TL_BR,
-            new int[]{Color.rgb(5, 22, 56), Color.rgb(8, 16, 37), Color.rgb(4, 12, 29)}));
-        TextView heading = (TextView) root.getChildAt(0);
-        heading.setTextSize(30);
-        heading.setGravity(Gravity.CENTER);
-        heading.setTextColor(Color.WHITE);
-        heading.setPadding(dp(8), dp(4), dp(8), dp(4));
-        TextView intro = text("Select an option to continue");
-        intro.setTextSize(16);
-        intro.setGravity(Gravity.CENTER);
-        intro.setTextColor(Color.rgb(192, 211, 237));
-        intro.setPadding(dp(8), 0, dp(8), dp(12));
-        root.addView(intro);
+            new int[]{Color.rgb(4, 34, 79), Color.rgb(5, 19, 46), Color.rgb(2, 11, 30)}));
+        TextView oldHeading = (TextView) root.getChildAt(0);
+        root.removeView(oldHeading);
 
-        // TV-first home: three primary sections and four compact shortcuts.
+        LinearLayout topBar = row();
+        TextView brand = text("▶ DREAM IPTV");
+        brand.setTextSize(24);
+        brand.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+        brand.setTextColor(Color.WHITE);
+        topBar.addView(brand, new LinearLayout.LayoutParams(0, dp(56), 1));
+        Button search = homeTile("⌕  SEARCH", Color.rgb(12, 37, 72), this::showSearch);
+        search.setTextSize(14);
+        topBar.addView(search, new LinearLayout.LayoutParams(dp(125), dp(48)));
+        Button settings = homeTile("⚙  SETTINGS", Color.rgb(12, 37, 72), this::showHomeSettings);
+        settings.setTextSize(14);
+        topBar.addView(settings, new LinearLayout.LayoutParams(dp(140), dp(48)));
+
         LinearLayout primary = row();
-        Button live = homeTile("▣\\nLIVE TV", Color.rgb(5, 91, 211), () -> showCategories("live"));
-        addHomeTile(primary, live, 185);
-        addHomeTile(primary, homeTile("▶\\nMOVIES", Color.rgb(204, 35, 46),
-            () -> showCategories("vod")), 185);
-        addHomeTile(primary, homeTile("▤\\nSERIES", Color.rgb(104, 32, 174),
-            () -> showCategories("series")), 185);
+        Button live = homeTile("▣\\nLIVE TV\\nWatch Live Channels",
+            Color.rgb(0, 88, 213), () -> showCategories("live"));
+        addHomeTile(primary, live, 196);
+        addHomeTile(primary, homeTile("▶\\nMOVIES\\nWatch Films",
+            Color.rgb(219, 32, 45), () -> showCategories("vod")), 196);
+        addHomeTile(primary, homeTile("▤\\nSERIES\\nTV Shows & Seasons",
+            Color.rgb(98, 14, 180), () -> showCategories("series")), 196);
 
         LinearLayout shortcuts = row();
-        addHomeTile(shortcuts, homeTile("◷  CATCH UP", Color.rgb(16, 54, 98),
-            () -> showCategories("live")), 92);
-        addHomeTile(shortcuts, homeTile("▦  TV GUIDE", Color.rgb(16, 54, 98),
-            this::showGuide), 92);
-        addHomeTile(shortcuts, homeTile("♡  FAVOURITES", Color.rgb(16, 54, 98),
-            () -> showCategories("live")), 92);
-        addHomeTile(shortcuts, homeTile("⚙  SETTINGS", Color.rgb(16, 54, 98),
-            this::showHomeSettings), 92);
+        addHomeTile(shortcuts, homeTile("◷  CATCH UP", Color.rgb(10, 46, 84),
+            () -> showCategories("live")), 88);
+        addHomeTile(shortcuts, homeTile("▦  TV GUIDE", Color.rgb(10, 46, 84),
+            this::showGuide), 88);
+        addHomeTile(shortcuts, homeTile("♥  FAVOURITES", Color.rgb(10, 46, 84),
+            () -> showCategories("live")), 88);
+        addHomeTile(shortcuts, homeTile("⚙  SETTINGS", Color.rgb(10, 46, 84),
+            this::showHomeSettings), 88);
         live.requestFocus();
+    }
+
+    private void showSearch() {
+        screen("SEARCH");
+        button("‹  HOME", this::showHome);
+        EditText query = loginField("Search channels, movies and series", false);
+        query.setSingleLine(true);
+        button("SEARCH LIVE TV", () -> showCategories("live"));
+        button("BROWSE MOVIES", () -> showCategories("vod"));
+        button("BROWSE SERIES", () -> showCategories("series"));
     }
 
     private Button homeTile(String label, int color, Runnable action) {
