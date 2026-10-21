@@ -95,13 +95,59 @@ public class MainActivity extends Activity {
 
         splash.setFocusableInTouchMode(true);
         splash.requestFocus();
-        final Runnable continueToApp = () -> {
+        new android.os.Handler(android.os.Looper.getMainLooper())
+            .postDelayed(this::showLoadingScreen, 1000);
+    }
+
+    // Page 2: centred loading state for foldables, phones and television screens.
+    private void showLoadingScreen() {
+        if (isFinishing() || isDestroyed()) return;
+        android.widget.FrameLayout loading = new android.widget.FrameLayout(this);
+        loading.setBackground(new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+            new int[]{Color.rgb(1, 14, 37), Color.rgb(3, 37, 89), Color.rgb(1, 10, 29)}));
+        setContentView(loading);
+        LinearLayout center = new LinearLayout(this);
+        center.setOrientation(LinearLayout.VERTICAL);
+        center.setGravity(Gravity.CENTER);
+        center.setPadding(dp(24), dp(20), dp(24), dp(20));
+        loading.addView(center, new android.widget.FrameLayout.LayoutParams(
+            -1, -2, Gravity.CENTER));
+
+        TextView mark = text("▶");
+        mark.setTextColor(Color.rgb(0, 160, 255));
+        mark.setTextSize(78);
+        mark.setGravity(Gravity.CENTER);
+        center.addView(mark);
+
+        TextView name = text("DREAM IPTV");
+        name.setTypeface(Typeface.DEFAULT_BOLD);
+        name.setTextSize(39);
+        name.setGravity(Gravity.CENTER);
+        center.addView(name);
+
+        TextView tagline = text("L I V E   ·   M O V I E S   ·   S E R I E S");
+        tagline.setTextSize(12);
+        tagline.setTextColor(Color.rgb(195, 218, 244));
+        tagline.setGravity(Gravity.CENTER);
+        center.addView(tagline);
+
+        ProgressBar spinner = new ProgressBar(this);
+        spinner.setIndeterminate(true);
+        spinner.setIndeterminateTintList(android.content.res.ColorStateList.valueOf(
+            Color.rgb(0, 170, 255)));
+        LinearLayout.LayoutParams spinnerParams = new LinearLayout.LayoutParams(dp(40), dp(40));
+        spinnerParams.gravity = Gravity.CENTER_HORIZONTAL;
+        spinnerParams.topMargin = dp(26);
+        center.addView(spinner, spinnerParams);
+
+        loading.setFocusableInTouchMode(true);
+        loading.requestFocus();
+        new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
             if (isFinishing() || isDestroyed()) return;
             getWindow().getDecorView().setSystemUiVisibility(0);
             if (!username.isEmpty() && !password.isEmpty()) showHome();
             else showLogin();
-        };
-        new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(continueToApp, 1400);
+        }, 750);
     }
 
     private TextView text(String value) {
