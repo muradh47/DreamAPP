@@ -573,37 +573,97 @@ public class MainActivity extends Activity {
         categorySidebar.addView(item, p);
     }
 
+    private final java.util.Map<String, JSONArray> categoryCache = new java.util.HashMap<>();
+    private final java.util.Map<String, JSONArray> itemCache = new java.util.LinkedHashMap<>();
+
     private void showCategories(String type) {
         currentType = type;
-        browserShell(type);
-        sidebarItem("Loading categories...", true, () -> {});
+        ++browseRequest;
+        screen(type.equals("live") ? "LIVE TV  •  CATEGORIES" :
+            type.equals("vod") ? "MOVIES  •  CATEGORIES" : "SERIES  •  CATEGORIES");
+        Button home = button("‹  HOME", this::showHome);
+        home.setTextSize(14);
+        TextView hint = text("Choose a category");
+        hint.setTextSize(15);
+        root.addView(hint);
+        GridLayout categoriesGrid = new GridLayout(this);
+        categoriesGrid.setColumnCount(2);
+        categoriesGrid.setUseDefaultMargins(false);
+        root.addView(categoriesGrid, new LinearLayout.LayoutParams(-1, -2));
+        JSONArray cached = categoryCache.get(type);
+        if (cached != null) {
+            renderCategoryTiles(type, cached, categoriesGrid);
+            return;
+        }
+        TextView loading = text("Loading categories...");
+        root.addView(loading);
         new Thread(() -> {
             try {
                 String action = type.equals("live") ? "get_live_categories" :
                     type.equals("vod") ? "get_vod_categories" : "get_series_categories";
                 JSONArray categories = new JSONArray(fetch(api(username, password, action)));
+                categoryCache.put(type, categories);
                 runOnUiThread(() -> {
-                    categorySidebar.removeAllViews();
-                    sidebarItem("ALL", true, () -> showItems(type, ""));
-                    for (int i = 0; i < categories.length(); i++) {
-                        JSONObject c = categories.optJSONObject(i);
-                        if (c == null) continue;
-                        String id = c.optString("category_id");
-                        String name = c.optString("category_name", "Other");
-                        sidebarItem(name, false, () -> showItems(type, id));
-                    }
-                    showItems(type, "");
+                    if (!type.equals(currentType) || categoriesGrid.getParent() == null) return;
+                    root.removeView(loading);
+                    renderCategoryTiles(type, categories, categoriesGrid);
                 });
             } catch (Exception ex) {
                 runOnUiThread(() -> {
-                    categorySidebar.removeAllViews();
-                    sidebarItem("ALL", true, () -> showItems(type, ""));
-                    contentGrid.removeAllViews();
-                    contentGrid.addView(text("Category loading failed: " + ex.getMessage()));
-                    showItems(type, "");
+                    if (categoriesGrid.getParent() == null) return;
+                    loading.setText("Categories unavailable. Tap to retry.");
+                    loading.setOnClickListener(v -> showCategories(type));
                 });
             }
         }).start();
+    }
+
+    private void renderCategoryTiles(String type, JSONArray categories, GridLayout grid) {
+        grid.removeAllViews();
+        addCategoryTile(grid, "▣  ALL " + (type.equals("live") ? "CHANNELS" :
+            type.equals("vod") ? "MOVIES" : "SERIES"), () -> openCategory(type, ""));
+        for (int i = 0; i < categories.length(); i++) {
+            JSONObject category = categories.optJSONObject(i);
+            if (category == null) continue;
+            String id = category.optString("category_id");
+            String name = category.optString("category_name", "Other");
+            addCategoryTile(grid, "▣  " + name, () -> openCategory(type, id));
+        }
+    }
+
+    private void addCategoryTile(GridLayout grid, String name, Runnable action) {
+        Button item = tile(name, Color.rgb(27, 43, 74), action);
+        item.setTextSize(15);
+        item.setGravity(Gravity.CENTER_VERTICAL | Gravity.LEFT);
+        item.setPadding(dp(16), dp(5), dp(8), dp(5));
+        item.setSingleLine(true);
+        item.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        item.setOnFocusChangeListener((v, focused) -> {
+            item.setBackgroundColor(focused ? Color.rgb(39, 111, 190) : Color.rgb(27, 43, 74));
+            item.setTextColor(Color.WHITE);
+        });
+        int width = getResources().getDisplayMetrics().widthPixels - dp(48);
+        GridLayout.LayoutParams params = new GridLayout.LayoutParams();
+        params.width = Math.max(dp(130), width / 2 - dp(8));
+        params.height = dp(58);
+        params.setMargins(dp(4), dp(4), dp(4), dp(4));
+        grid.addView(item, params);
+    }
+
+    private void openCategory(String type, String categoryId) {
+        browserShell(type);
+        categorySidebar.removeAllViews();
+        sidebarItem("‹ CATEGORIES", true, () -> showCategories(type));
+        sidebarItem("ALL", categoryId.isEmpty(), () -> openCategory(type, ""));
+        JSONArray categories = categoryCache.get(type);
+        if (categories != null) for (int i = 0; i < categories.length(); i++) {
+            JSONObject category = categories.optJSONObject(i);
+            if (category == null) continue;
+            String id = category.optString("category_id");
+            String name = category.optString("category_name", "Other");
+            sidebarItem(name, id.equals(categoryId), () -> openCategory(type, id));
+        }
+        showItems(type, categoryId);
     }
 
     private void showItems(String type, String categoryId) {
@@ -620,6 +680,16 @@ public class MainActivity extends Activity {
             View v = categorySidebar.getChildAt(i);
             if (v instanceof Button) v.setAlpha(0.85f);
         }
+        String cacheKey = type + ":" + categoryId;
+        JSONArray cachedItems = itemCache.get(cacheKey);
+        if (cachedItems != null) {
+            contentGrid.removeAllViews();
+            currentItems = cachedItems;
+            currentBrowseType = type;
+            nextItemIndex = 0;
+            appendNextPage();
+            return;
+        }
         new Thread(() -> {
             try {
                 String action = type.equals("live") ? "get_live_streams" :
@@ -627,6 +697,10 @@ public class MainActivity extends Activity {
                 String request = api(username, password, action);
                 if (!categoryId.isEmpty()) request += "&category_id=" + enc(categoryId);
                 JSONArray items = new JSONArray(fetch(request));
+                synchronized (itemCache) {
+                    if (itemCache.size() >= 8) itemCache.remove(itemCache.keySet().iterator().next());
+                    itemCache.put(cacheKey, items);
+                }
                 runOnUiThread(() -> {
                     if (requestId != browseRequest || contentGrid == null) return;
                     contentGrid.removeAllViews();
@@ -693,6 +767,7 @@ public class MainActivity extends Activity {
         card.setOnFocusChangeListener((v, focused) -> card.setBackgroundColor(
             focused ? Color.rgb(33, 107, 187) : Color.rgb(29, 36, 52)));
         ImageView image = new ImageView(this);
+        image.setImageResource(android.R.drawable.ic_menu_gallery);
         image.setScaleType(ImageView.ScaleType.FIT_CENTER);
         image.setPadding(dp(8), dp(8), dp(8), dp(8));
         card.addView(image, new LinearLayout.LayoutParams(-1, dp(105)));
