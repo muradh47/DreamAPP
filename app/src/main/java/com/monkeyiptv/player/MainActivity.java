@@ -209,32 +209,31 @@ public class MainActivity extends Activity {
         intro.setPadding(dp(8), 0, dp(8), dp(12));
         root.addView(intro);
 
-        // Familiar TV launcher: four large, equally sized choices in a 2 × 2 grid.
-        LinearLayout first = row();
-        Button live = homeTile("▣\nLIVE TV", Color.rgb(11, 77, 164), () -> showCategories("live"));
-        addHomeTile(first, live, 136);
-        addHomeTile(first, homeTile("▶\nMOVIES", Color.rgb(18, 79, 146),
-            () -> showCategories("vod")), 136);
-
-        LinearLayout second = row();
-        addHomeTile(second, homeTile("▤\nSERIES", Color.rgb(24, 70, 131),
-            () -> showCategories("series")), 136);
-        addHomeTile(second, homeTile("◷\nCATCH UP", Color.rgb(28, 64, 117),
-            () -> showCategories("live")), 136);
+        // TV-first home: three primary sections and four compact shortcuts.
+        LinearLayout primary = row();
+        Button live = homeTile("▣\\nLIVE TV", Color.rgb(5, 91, 211), () -> showCategories("live"));
+        addHomeTile(primary, live, 185);
+        addHomeTile(primary, homeTile("▶\\nMOVIES", Color.rgb(204, 35, 46),
+            () -> showCategories("vod")), 185);
+        addHomeTile(primary, homeTile("▤\\nSERIES", Color.rgb(104, 32, 174),
+            () -> showCategories("series")), 185);
 
         LinearLayout shortcuts = row();
-        addHomeTile(shortcuts, homeTile("▦  TV GUIDE", Color.rgb(21, 42, 76),
-            this::showGuide), 72);
-        addHomeTile(shortcuts, homeTile("♡  FAVOURITES", Color.rgb(21, 42, 76),
-            () -> showCategories("live")), 72);
-        addHomeTile(shortcuts, homeTile("⚙  SETTINGS", Color.rgb(21, 42, 76),
-            this::showHomeSettings), 72);
+        addHomeTile(shortcuts, homeTile("◷  CATCH UP", Color.rgb(16, 54, 98),
+            () -> showCategories("live")), 92);
+        addHomeTile(shortcuts, homeTile("▦  TV GUIDE", Color.rgb(16, 54, 98),
+            this::showGuide), 92);
+        addHomeTile(shortcuts, homeTile("♡  FAVOURITES", Color.rgb(16, 54, 98),
+            () -> showCategories("live")), 92);
+        addHomeTile(shortcuts, homeTile("⚙  SETTINGS", Color.rgb(16, 54, 98),
+            this::showHomeSettings), 92);
         live.requestFocus();
     }
 
     private Button homeTile(String label, int color, Runnable action) {
         Button tile = tile(label, color, action);
         tile.setTextSize(21);
+        tile.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
         tile.setLineSpacing(dp(4), 1f);
         tile.setOnFocusChangeListener((view, focused) -> {
             GradientDrawable background = new GradientDrawable(
@@ -252,7 +251,7 @@ public class MainActivity extends Activity {
 
     private void addHomeTile(LinearLayout parent, Button tile, int height) {
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dp(height), 1f);
-        params.setMargins(dp(5), dp(5), dp(5), dp(5));
+        params.setMargins(dp(6), dp(6), dp(6), dp(6));
         parent.addView(tile, params);
     }
 
