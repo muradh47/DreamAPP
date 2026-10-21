@@ -315,10 +315,11 @@ public class MainActivity extends Activity {
 
     private void showHome() {
         releasePlayer();
-        setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+        setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
         getWindow().getDecorView().setSystemUiVisibility(0);
         screen("DREAM IPTV");
-        root.setPadding(dp(22), dp(10), dp(22), dp(18));
+        boolean compact = getResources().getDisplayMetrics().widthPixels < dp(700);
+        root.setPadding(dp(compact ? 12 : 22), dp(10), dp(compact ? 12 : 22), dp(18));
         root.setGravity(Gravity.CENTER_VERTICAL);
         root.setBackground(new GradientDrawable(GradientDrawable.Orientation.TL_BR,
             new int[]{Color.rgb(4, 34, 79), Color.rgb(5, 19, 46), Color.rgb(2, 11, 30)}));
@@ -331,25 +332,27 @@ public class MainActivity extends Activity {
         brand.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
         brand.setTextColor(Color.WHITE);
         topBar.addView(brand, new LinearLayout.LayoutParams(0, dp(56), 1));
-        Button search = homeTile("⌕  SEARCH", Color.rgb(12, 37, 72), this::showSearch);
+        Button search = homeTile(compact ? "⌕" : "⌕  SEARCH", Color.rgb(12, 37, 72), this::showSearch);
         search.setTextSize(14);
-        topBar.addView(search, new LinearLayout.LayoutParams(dp(125), dp(48)));
-        Button settings = homeTile("⚙  SETTINGS", Color.rgb(12, 37, 72), this::showHomeSettings);
+        topBar.addView(search, new LinearLayout.LayoutParams(dp(compact ? 52 : 125), dp(48)));
+        Button settings = homeTile(compact ? "⚙" : "⚙  SETTINGS", Color.rgb(12, 37, 72), this::showHomeSettings);
         settings.setTextSize(14);
-        topBar.addView(settings, new LinearLayout.LayoutParams(dp(140), dp(48)));
+        topBar.addView(settings, new LinearLayout.LayoutParams(dp(compact ? 52 : 140), dp(48)));
 
         LinearLayout primary = row();
+        if (compact) primary.setOrientation(LinearLayout.VERTICAL);
         Button live = homeTile("▣\\nLIVE TV\\nWatch Live Channels",
             Color.rgb(0, 88, 213), () -> showCategories("live"));
-        addHomeTile(primary, live, 196);
+        addHomeTile(primary, live, compact ? 126 : 196);
         addHomeTile(primary, homeTile("▶\\nMOVIES\\nWatch Films",
-            Color.rgb(219, 32, 45), () -> showCategories("vod")), 196);
+            Color.rgb(219, 32, 45), () -> showCategories("vod")), compact ? 126 : 196);
         addHomeTile(primary, homeTile("▤\\nSERIES\\nTV Shows & Seasons",
             Color.rgb(98, 14, 180), () -> showCategories("series")), 196);
 
         LinearLayout shortcuts = row();
+        if (compact) shortcuts.setOrientation(LinearLayout.VERTICAL);
         addHomeTile(shortcuts, homeTile("◷  CATCH UP", Color.rgb(10, 46, 84),
-            () -> showCategories("live")), 88);
+            () -> showCategories("live")), compact ? 64 : 88);
         addHomeTile(shortcuts, homeTile("▦  TV GUIDE", Color.rgb(10, 46, 84),
             this::showGuide), 88);
         addHomeTile(shortcuts, homeTile("♥  FAVOURITES", Color.rgb(10, 46, 84),
@@ -389,7 +392,9 @@ public class MainActivity extends Activity {
     }
 
     private void addHomeTile(LinearLayout parent, Button tile, int height) {
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dp(height), 1f);
+        boolean vertical = parent.getOrientation() == LinearLayout.VERTICAL;
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+            vertical ? -1 : 0, dp(height), vertical ? 0f : 1f);
         params.setMargins(dp(6), dp(6), dp(6), dp(6));
         parent.addView(tile, params);
     }
