@@ -1,0 +1,64 @@
+{
+  "productName": "Dream IPTV",
+  "mainBinaryName": "extreme-infinitv",
+  "version": "1.9.0",
+  "identifier": "com.dreamiptv.player",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:4321",
+    "beforeDevCommand": "node ./src/scripts/ensure-ffmpeg-sidecar.mjs && pnpm run dev",
+    "beforeBuildCommand": "node ./src/scripts/ensure-ffmpeg-sidecar.mjs && pnpm run build"
+  },
+  "app": {
+    "macOSPrivateApi": true,
+    "windows": [
+      {
+        "title": "Dream IPTV",
+        "width": 1300,
+        "height": 850,
+        "minWidth": 900,
+        "minHeight": 600,
+        "resizable": true,
+        "fullscreen": false,
+        "center": true,
+        "focus": true,
+        "visible": false,
+        "decorations": false,
+        "dragDropEnabled": false,
+        "backgroundColor": "#0b0f14"
+      }
+    ],
+    "security": {
+      "csp": null,
+      "assetProtocol": {
+        "enable": true,
+        "scope": [
+          "$DOWNLOAD/**",
+          "$VIDEO/**",
+          "$HOME/**",
+          "$APPDATA/**",
+          "$APPLOCALDATA/**"
+        ]
+      }
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "publisher": "InfiniteL8p",
+    "category": "public.app-category.video",
+    "copyright": "\u00a9 2025 Ludovico Ferrara",
+    "createUpdaterArtifacts": true,
+    "android": {
+      "versionCode": 109009000
+    },
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  },
+  "plugins": {}
+}

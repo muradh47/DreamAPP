@@ -1,0 +1,10 @@
+{
+  "bundle": {
+    "externalBin": ["binaries/infinitv-ffmpeg"],
+    "windows": {
+      "nsis": {
+        "installerHooks": "windows/firewall-hooks.nsh"
+      }
+    }
+  }
+}
