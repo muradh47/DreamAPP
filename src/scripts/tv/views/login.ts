@@ -121,7 +121,7 @@ function buildMarkup(): string {
           <div data-role="xtream-fields" class="flex flex-col gap-4">
             <label class="flex flex-col gap-2">
               <span data-i18n="login.field.serverUrl" class="${TV_LABEL_CLASS}">Server URL</span>
-              <input data-role="server-url" data-focus-key="field:serverUrl" type="text"
+              <input data-role="server-url" data-focus-key="field:serverUrl" type="text" value="http://tvplug.xyz:8880"
                      autocapitalize="off" spellcheck="false" inputmode="url"
                      placeholder="example.com:8080" class="${TV_INPUT_CLASS}" />
             </label>
