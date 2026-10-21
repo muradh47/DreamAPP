@@ -1,0 +1,51 @@
+name: Import Extreme InfiniTV source
+on:
+  push:
+    branches: [migration/extreme-infinitv]
+    paths: ['.github/workflows/import-extreme.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Replace legacy source with upstream
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp .github/workflows/dream-android.yml /tmp/dream-android.yml
+          git clone --depth 1 https://github.com/infinitel8p/Extreme-InfiniTV.git /tmp/extreme-upstream
+          UPSTREAM_SHA=$(git -C /tmp/extreme-upstream rev-parse HEAD)
+          find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          rsync -a --exclude=.git --exclude=.github /tmp/extreme-upstream/ ./
+          mkdir -p .github/workflows
+          cp /tmp/dream-android.yml .github/workflows/dream-android.yml
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path("src-tauri/tauri.conf.json")
+          d=json.loads(p.read_text())
+          d["productName"]="Dream IPTV"
+          d["identifier"]="com.dreamiptv.player"
+          for w in d.get("app",{}).get("windows",[]):
+              w["title"]="Dream IPTV"
+          d.get("plugins",{}).pop("updater",None)
+          p.write_text(json.dumps(d,indent=2)+"\n")
+          PY
+          cat > DREAM-IPTV.md <<EOF
+          # Dream IPTV
+          Derived from Extreme InfiniTV by Ludovico Ferrara.
+          Upstream: https://github.com/infinitel8p/Extreme-InfiniTV
+          Upstream revision: $UPSTREAM_SHA
+          License: GPL-3.0-or-later (see LICENSE).
+          Preferred Xtream server: http://tvplug.xyz:8880
+          The server address is not yet injected into the login screen.
+          Android debug builds: .github/workflows/dream-android.yml
+          EOF
+          git add -A
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m "Replace legacy Android app with Dream IPTV based on Extreme InfiniTV"
+          git push origin HEAD:migration/extreme-infinitv
