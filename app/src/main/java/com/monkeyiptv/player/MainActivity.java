@@ -271,18 +271,24 @@ public class MainActivity extends Activity {
 
         LinearLayout overlay = new LinearLayout(this);
         overlay.setOrientation(LinearLayout.VERTICAL);
-        overlay.setPadding(dp(18), dp(12), dp(18), dp(12));
-        overlay.setBackgroundColor(Color.argb(225, 12, 21, 37));
+        overlay.setPadding(dp(14), dp(8), dp(14), dp(8));
+        overlay.setBackgroundColor(Color.argb(210, 12, 18, 30));
         android.widget.FrameLayout.LayoutParams overlayParams = new android.widget.FrameLayout.LayoutParams(
             -1, -2, Gravity.BOTTOM);
         fullscreen.addView(overlay, overlayParams);
-        TextView title = text(channel + "   •   TV GUIDE");
-        title.setTextSize(19);
+        TextView title = text(channel);
+        title.setTextSize(17);
         title.setTextColor(Color.WHITE);
         overlay.addView(title);
         TextView now = text("NOW  •  Loading programme information...");
+        now.setTextSize(14);
+        now.setMaxLines(2);
+        now.setEllipsize(android.text.TextUtils.TruncateAt.END);
         overlay.addView(now);
         TextView next = text("NEXT  •  Loading...");
+        next.setTextSize(14);
+        next.setMaxLines(2);
+        next.setEllipsize(android.text.TextUtils.TruncateAt.END);
         overlay.addView(next);
         // Dream IPTV player controls: TV remote focusable and touch friendly.
         LinearLayout playerControls = new LinearLayout(this);
@@ -301,7 +307,7 @@ public class MainActivity extends Activity {
                 pauseButton.setText("PAUSE");
             }
         });
-        playerControls.addView(pauseButton, new LinearLayout.LayoutParams(0, dp(52), 1f));
+        playerControls.addView(pauseButton, new LinearLayout.LayoutParams(0, dp(40), 1f));
         Button fitButton = new Button(this);
         fitButton.setText("ASPECT: FIT");
         fitButton.setAllCaps(false);
@@ -328,11 +334,7 @@ public class MainActivity extends Activity {
         TextView playerStatus = text("Connecting to live stream...");
         playerStatus.setTextSize(14);
         overlay.addView(playerStatus);
-        android.widget.ScrollView scroll = new android.widget.ScrollView(this);
-        LinearLayout schedule = new LinearLayout(this);
-        schedule.setOrientation(LinearLayout.VERTICAL);
-        scroll.addView(schedule);
-        overlay.addView(scroll, new LinearLayout.LayoutParams(-1, dp(115)));
+        LinearLayout schedule = new LinearLayout(this); // EPG data only; full listings live in TV GUIDE.
         overlay.setVisibility(View.GONE);
 
         android.view.View tapArea = new android.view.View(this);
@@ -343,9 +345,9 @@ public class MainActivity extends Activity {
         overlay.setOnClickListener(v -> overlay.setVisibility(View.GONE));
         overlay.setClickable(true);
         Button back = new Button(this);
-        back.setText("← " + (fromGuide ? "GUIDE" : "CHANNELS"));
+        back.setText("← BACK");
         android.widget.FrameLayout.LayoutParams backParams = new android.widget.FrameLayout.LayoutParams(
-            dp(145), dp(48), Gravity.TOP | Gravity.START);
+            dp(104), dp(40), Gravity.TOP | Gravity.START);
         backParams.setMargins(dp(12), dp(12), 0, 0);
         fullscreen.addView(back, backParams);
         back.setOnClickListener(v -> {
@@ -358,7 +360,7 @@ public class MainActivity extends Activity {
         epgRefresh = new Runnable() {
             @Override public void run() {
                 if (request != epgRequest) return;
-                loadChannelEpg(id, request, now, next, schedule);
+                loadChannelEpg(id, request, now, next, schedule, true);
                 epgHandler.postDelayed(this, 60000);
             }
         };
@@ -436,6 +438,10 @@ public class MainActivity extends Activity {
     }
 
     private void loadChannelEpg(String id, int request, TextView now, TextView next, LinearLayout schedule) {
+        loadChannelEpg(id, request, now, next, schedule, false);
+    }
+
+    private void loadChannelEpg(String id, int request, TextView now, TextView next, LinearLayout schedule, boolean compact) {
         new Thread(() -> {
             try {
                 JSONObject data = new JSONObject(fetch(api(username, password, "get_short_epg")
@@ -456,14 +462,18 @@ public class MainActivity extends Activity {
                             if (start > current && (upcoming == null ||
                                 start < epgTime(upcoming.optString("start_timestamp"), upcoming.optString("start"))))
                                 upcoming = item;
-                            TextView programme = text(epgLabel(item));
-                            programme.setTextSize(16);
-                            programme.setBackgroundColor(i % 2 == 0 ? Color.rgb(24, 37, 62) : Color.rgb(18, 28, 49));
-                            schedule.addView(programme);
+                            if (!compact) {
+                                TextView programme = text(epgLabel(item));
+                                programme.setTextSize(16);
+                                programme.setBackgroundColor(i % 2 == 0 ? Color.rgb(24, 37, 62) : Color.rgb(18, 28, 49));
+                                schedule.addView(programme);
+                            }
                         }
                     }
-                    now.setText(playing == null ? "No current programme information available" : epgLabel(playing));
-                    next.setText(upcoming == null ? "No upcoming programme information available" : epgLabel(upcoming));
+                    now.setText(playing == null ? "NOW  •  Programme unavailable" :
+                        (compact ? "NOW  •  " + shortEpgLabel(playing) : epgLabel(playing)));
+                    next.setText(upcoming == null ? "NEXT  •  Programme unavailable" :
+                        (compact ? "NEXT  •  " + shortEpgLabel(upcoming) : epgLabel(upcoming)));
                 });
             } catch (Exception ex) {
                 runOnUiThread(() -> { if (request == epgRequest) {
@@ -472,6 +482,12 @@ public class MainActivity extends Activity {
                 }});
             }
         }).start();
+    }
+
+    private String shortEpgLabel(JSONObject programme) {
+        String label = epgLabel(programme);
+        String[] lines = label.split("\\n");
+        return lines.length > 1 ? lines[1].trim() : label.trim();
     }
 
     private long epgTime(String timestamp, String date) {
