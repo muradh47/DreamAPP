@@ -6,8 +6,8 @@ android {
         applicationId = "com.monkeyiptv.player"
         minSdk = 23
         targetSdk = 35
-        versionCode = 3000003
-        versionName = "3.0.3"
+        versionCode = 3000004
+        versionName = "1.0.0-beta.1"
         buildConfigField("String", "SERVER_URL", "\"http://tvplug.xyz:8880\"")
     }
     signingConfigs {
