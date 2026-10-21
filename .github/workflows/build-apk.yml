@@ -44,4 +44,12 @@ jobs:
           export APK_KEY_ALIAS="$KEY_ALIAS"
           export APK_KEY_PASSWORD="$KEY_PASS"
           gradle :app:assembleRelease --no-daemon
-          gh release create v3.0.1 app/build/outputs/apk/release/app-release.apk --title "Dream IPTV v3.0.1 - Player Update" --notes "Original Dream IPTV with the integrated streamlined fullscreen player and fixed updater." --target "$GITHUB_SHA"
+          gh release create v3.0.2 app/build/outputs/apk/release/app-release.apk --title "Dream IPTV v3.0.2 - Player Update" --notes "Original Dream IPTV with the integrated streamlined fullscreen player and fixed updater." --target "$GITHUB_SHA"
+
+      - name: Upload signed APK for testing
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dream-iptv-signed-release-apk
+          path: app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: ignore
