@@ -539,29 +539,19 @@ public class MainActivity extends Activity {
         header.setGravity(Gravity.CENTER_VERTICAL);
         header.setPadding(dp(12), dp(8), dp(12), dp(8));
         page.addView(header, new LinearLayout.LayoutParams(-1, dp(68)));
-        Button back = tile("‹ HOME", Color.rgb(34, 47, 76), this::showHome);
-        header.addView(back, new LinearLayout.LayoutParams(dp(115), dp(50)));
+        Button back = tile("‹ CATEGORIES", Color.rgb(34, 47, 76), () -> showCategories(type));
+        back.setTextSize(14);
+        header.addView(back, new LinearLayout.LayoutParams(dp(155), dp(48)));
         browserHeading = text(type.equals("live") ? "LIVE TV" : type.equals("vod") ? "MOVIES" : "SERIES");
-        browserHeading.setTextSize(23);
+        browserHeading.setTextSize(20);
         header.addView(browserHeading, new LinearLayout.LayoutParams(0, -2, 1));
-        TextView clock = text(new java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(new java.util.Date()));
-        header.addView(clock);
-
-        LinearLayout body = new LinearLayout(this);
-        page.addView(body, new LinearLayout.LayoutParams(-1, 0, 1));
-        ScrollView left = new ScrollView(this);
-        left.setBackgroundColor(Color.rgb(22, 31, 56));
-        body.addView(left, new LinearLayout.LayoutParams(dp(210), -1));
-        categorySidebar = new LinearLayout(this);
-        categorySidebar.setOrientation(LinearLayout.VERTICAL);
-        left.addView(categorySidebar);
-
-        ScrollView right = new ScrollView(this);
-        body.addView(right, new LinearLayout.LayoutParams(0, -1, 1));
+        ScrollView scroll = new ScrollView(this);
+        page.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
         contentGrid = new GridLayout(this);
         contentGrid.setColumnCount(3);
-        contentGrid.setPadding(dp(8), dp(8), dp(8), dp(8));
-        right.addView(contentGrid);
+        contentGrid.setPadding(dp(12), dp(10), dp(12), dp(10));
+        scroll.addView(contentGrid);
+        categorySidebar = new LinearLayout(this);
     }
 
     private void sidebarItem(String title, boolean selected, Runnable action) {
@@ -652,18 +642,19 @@ public class MainActivity extends Activity {
 
     private void openCategory(String type, String categoryId) {
         browserShell(type);
-        categorySidebar.removeAllViews();
-        sidebarItem("‹ CATEGORIES", true, () -> showCategories(type));
-        sidebarItem("ALL", categoryId.isEmpty(), () -> openCategory(type, ""));
+        String categoryName = "ALL";
         JSONArray categories = categoryCache.get(type);
         if (categories != null) for (int i = 0; i < categories.length(); i++) {
             JSONObject category = categories.optJSONObject(i);
-            if (category == null) continue;
-            String id = category.optString("category_id");
-            String name = category.optString("category_name", "Other");
-            sidebarItem(name, id.equals(categoryId), () -> openCategory(type, id));
+            if (category != null && categoryId.equals(category.optString("category_id"))) {
+                categoryName = category.optString("category_name", "Category");
+                break;
+            }
         }
+        final String selectedCategory = categoryName;
+        browserHeading.setText(selectedCategory);
         showItems(type, categoryId);
+        browserHeading.setText(selectedCategory);
     }
 
     private void showItems(String type, String categoryId) {
@@ -672,14 +663,9 @@ public class MainActivity extends Activity {
         int requestId = ++browseRequest;
         currentItems = null;
         loadMoreButton = null;
-        if (contentGrid == null || categorySidebar == null) { showCategories(type); return; }
-        browserHeading.setText(type.equals("live") ? "LIVE TV" : type.equals("vod") ? "MOVIES" : "SERIES");
+        if (contentGrid == null) { openCategory(type, categoryId); return; }
         contentGrid.removeAllViews();
         contentGrid.addView(text("Loading channels and posters..."));
-        for (int i = 0; i < categorySidebar.getChildCount(); i++) {
-            View v = categorySidebar.getChildAt(i);
-            if (v instanceof Button) v.setAlpha(0.85f);
-        }
         String cacheKey = type + ":" + categoryId;
         JSONArray cachedItems = itemCache.get(cacheKey);
         if (cachedItems != null) {
