@@ -548,7 +548,7 @@ public class MainActivity extends Activity {
         ScrollView scroll = new ScrollView(this);
         page.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
         contentGrid = new GridLayout(this);
-        contentGrid.setColumnCount(3);
+        contentGrid.setColumnCount(type.equals("live") ? 2 : 4);
         contentGrid.setPadding(dp(12), dp(10), dp(12), dp(10));
         scroll.addView(contentGrid);
         categorySidebar = new LinearLayout(this);
@@ -732,7 +732,8 @@ public class MainActivity extends Activity {
                 });
             loadMoreButton = more;
             GridLayout.LayoutParams gp = new GridLayout.LayoutParams();
-            gp.width = dp(155); gp.height = dp(90);
+            gp.width = currentBrowseType.equals("live") ? dp(260) : dp(155);
+            gp.height = dp(70);
             gp.setMargins(dp(6), dp(6), dp(6), dp(6));
             contentGrid.addView(more, gp);
         }
@@ -741,6 +742,41 @@ public class MainActivity extends Activity {
     private Button loadMoreButton;
 
     private void channelCard(String name, String logo, String type, String id, String ext, JSONObject metadata) {
+        if (type.equals("live")) {
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            row.setPadding(dp(12), dp(5), dp(12), dp(5));
+            row.setBackgroundColor(Color.rgb(27, 37, 57));
+            row.setFocusable(true);
+            row.setClickable(true);
+            row.setOnClickListener(v -> showChannel(id, name));
+            row.setOnFocusChangeListener((v, focused) -> {
+                row.setBackgroundColor(focused ? Color.rgb(35, 111, 191) : Color.rgb(27, 37, 57));
+                row.setScaleX(focused ? 1.015f : 1f);
+                row.setScaleY(focused ? 1.015f : 1f);
+            });
+            ImageView logoView = new ImageView(this);
+            logoView.setScaleType(ImageView.ScaleType.FIT_CENTER);
+            logoView.setImageResource(android.R.drawable.ic_media_play);
+            row.addView(logoView, new LinearLayout.LayoutParams(dp(58), dp(52)));
+            loadArtwork(logo, logoView);
+            TextView titleView = text(name);
+            titleView.setTextSize(17);
+            titleView.setMaxLines(2);
+            titleView.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            titleView.setGravity(Gravity.CENTER_VERTICAL);
+            titleView.setPadding(dp(12), 0, 0, 0);
+            row.addView(titleView, new LinearLayout.LayoutParams(0, -1, 1f));
+            GridLayout.LayoutParams rowParams = new GridLayout.LayoutParams();
+            int available = getResources().getDisplayMetrics().widthPixels - dp(52);
+            rowParams.width = Math.max(dp(200), available / 2 - dp(12));
+            rowParams.height = dp(68);
+            rowParams.setMargins(dp(5), dp(5), dp(5), dp(5));
+            contentGrid.addView(row, rowParams);
+            if (contentGrid.getChildCount() == 1) row.requestFocus();
+            return;
+        }
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
         card.setBackgroundColor(Color.rgb(29, 36, 52));
