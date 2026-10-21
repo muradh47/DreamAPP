@@ -465,12 +465,13 @@ public class MainActivity extends Activity {
         LinearLayout overlay = new LinearLayout(this);
         overlay.setOrientation(LinearLayout.VERTICAL);
         overlay.setPadding(dp(14), dp(8), dp(14), dp(8));
-        overlay.setBackgroundColor(Color.argb(210, 12, 18, 30));
+        overlay.setBackgroundColor(Color.argb(232, 9, 25, 53));
         android.widget.FrameLayout.LayoutParams overlayParams = new android.widget.FrameLayout.LayoutParams(
             -1, -2, Gravity.BOTTOM);
         fullscreen.addView(overlay, overlayParams);
         TextView title = text(channel);
-        title.setTextSize(17);
+        title.setTextSize(21);
+        title.setTypeface(Typeface.DEFAULT_BOLD);
         title.setTextColor(Color.WHITE);
         overlay.addView(title);
         TextView now = text("NOW  •  Loading programme information...");
@@ -529,16 +530,37 @@ public class MainActivity extends Activity {
         overlay.addView(playerStatus);
         LinearLayout schedule = new LinearLayout(this); // EPG data only; full listings live in TV GUIDE.
         overlay.setVisibility(View.GONE);
+        // Keep the video tap target behind the controls so buttons remain clickable.
+        fullscreen.removeView(overlay);
 
         android.view.View tapArea = new android.view.View(this);
         tapArea.setClickable(true);
         fullscreen.addView(tapArea, new android.widget.FrameLayout.LayoutParams(-1, -1));
-        tapArea.setOnClickListener(v -> overlay.setVisibility(
-            overlay.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE));
-        overlay.setOnClickListener(v -> overlay.setVisibility(View.GONE));
-        overlay.setClickable(true);
+        tapArea.setFocusable(true);
+        tapArea.setOnClickListener(v -> {
+            boolean showing = overlay.getVisibility() != View.VISIBLE;
+            overlay.setVisibility(showing ? View.VISIBLE : View.GONE);
+            if (showing) pauseButton.requestFocus();
+            else tapArea.requestFocus();
+        });
+        tapArea.setOnKeyListener((v, keyCode, event) -> {
+            if (event.getAction() != android.view.KeyEvent.ACTION_DOWN) return false;
+            if (keyCode == android.view.KeyEvent.KEYCODE_DPAD_CENTER ||
+                keyCode == android.view.KeyEvent.KEYCODE_ENTER ||
+                keyCode == android.view.KeyEvent.KEYCODE_DPAD_UP ||
+                keyCode == android.view.KeyEvent.KEYCODE_DPAD_DOWN) {
+                overlay.setVisibility(View.VISIBLE);
+                pauseButton.requestFocus();
+                return true;
+            }
+            return false;
+        });
+        fullscreen.addView(overlay, new android.widget.FrameLayout.LayoutParams(
+            -1, -2, Gravity.BOTTOM));
         Button back = new Button(this);
         back.setText("← BACK");
+        back.setTextSize(13);
+        back.setFocusable(true);
         android.widget.FrameLayout.LayoutParams backParams = new android.widget.FrameLayout.LayoutParams(
             dp(104), dp(40), Gravity.TOP | Gravity.START);
         backParams.setMargins(dp(12), dp(12), 0, 0);
@@ -571,7 +593,7 @@ public class MainActivity extends Activity {
                 playerStatus.setText("Stream error: " + error.getErrorCodeName());
             }
         });
-        pauseButton.requestFocus();
+        tapArea.requestFocus();
     }
 
     private void showEpgInline(String id, String channel, boolean fromGuide) {
