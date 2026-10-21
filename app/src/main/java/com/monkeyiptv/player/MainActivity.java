@@ -208,12 +208,41 @@ public class MainActivity extends Activity {
     }
 
     private void showLogin() {
-        screen("DREAM IPTV");
-        TextView welcome = text("Welcome to Dream IPTV");
-        welcome.setTextSize(26);
+        setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
+        getWindow().getDecorView().setSystemUiVisibility(0);
+        screen("");
+        root.removeAllViews();
+        root.setGravity(Gravity.CENTER);
+        root.setBackground(new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+            new int[]{Color.rgb(2, 18, 47), Color.rgb(5, 37, 84), Color.rgb(2, 12, 32)}));
+        LinearLayout page = root;
+        LinearLayout panel = new LinearLayout(this);
+        panel.setOrientation(LinearLayout.VERTICAL);
+        panel.setGravity(Gravity.CENTER_HORIZONTAL);
+        panel.setPadding(dp(22), dp(18), dp(22), dp(20));
+        GradientDrawable panelBg = new GradientDrawable();
+        panelBg.setColor(Color.rgb(9, 28, 59));
+        panelBg.setCornerRadius(dp(20));
+        panelBg.setStroke(dp(1), Color.rgb(36, 84, 141));
+        panel.setBackground(panelBg);
+        int widthPx = getResources().getDisplayMetrics().widthPixels;
+        LinearLayout.LayoutParams panelParams = new LinearLayout.LayoutParams(
+            Math.min(dp(520), Math.max(dp(260), widthPx - dp(48))), -2);
+        panelParams.gravity = Gravity.CENTER;
+        page.addView(panel, panelParams);
+        root = panel;
+
+        TextView logo = text("▶  DREAM IPTV");
+        logo.setTextSize(29);
+        logo.setTypeface(Typeface.DEFAULT_BOLD);
+        logo.setTextColor(Color.WHITE);
+        logo.setGravity(Gravity.CENTER);
+        root.addView(logo);
+        TextView welcome = text("Welcome Back");
+        welcome.setTextSize(23);
         welcome.setGravity(Gravity.CENTER);
         root.addView(welcome);
-        TextView subtitle = text("Sign in to enjoy your entertainment");
+        TextView subtitle = text("Sign in to start watching");
         subtitle.setGravity(Gravity.CENTER);
         subtitle.setTextColor(Color.LTGRAY);
         root.addView(subtitle);
@@ -226,7 +255,8 @@ public class MainActivity extends Activity {
         }
         CheckBox remember = new CheckBox(this);
         remember.setText("Remember username and password");
-        remember.setTextColor(Color.WHITE);
+        remember.setTextColor(Color.rgb(205, 225, 246));
+        remember.setTextSize(14);
         remember.setChecked(rememberEnabled);
         root.addView(remember);
         EditText pass = loginField("Password", true);
@@ -256,12 +286,12 @@ public class MainActivity extends Activity {
                 } catch (Exception ex) { runOnUiThread(() -> status.setText("Login failed: " + ex.getMessage())); }
             }).start();
         });
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, dp(60));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, dp(58));
         lp.setMargins(dp(12), dp(18), dp(12), dp(12));
         root.addView(login, lp);
-        TextView note = text("Your server is configured automatically.");
+        TextView note = text("Secure sign in  •  Server configured automatically");
         note.setGravity(Gravity.CENTER);
-        note.setTextSize(14);
+        note.setTextSize(12);
         note.setTextColor(Color.LTGRAY);
         root.addView(note);
     }
