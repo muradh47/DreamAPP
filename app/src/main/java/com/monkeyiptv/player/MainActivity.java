@@ -194,14 +194,17 @@ public class MainActivity extends Activity {
         getWindow().getDecorView().setSystemUiVisibility(0);
         screen("DREAM IPTV");
         root.setPadding(dp(20), dp(12), dp(20), dp(20));
+        root.setGravity(Gravity.CENTER_VERTICAL);
         root.setBackground(new GradientDrawable(GradientDrawable.Orientation.TL_BR,
             new int[]{Color.rgb(6, 31, 82), Color.rgb(9, 18, 44), Color.rgb(5, 13, 31)}));
         TextView heading = (TextView) root.getChildAt(0);
         heading.setTextSize(32);
+        heading.setGravity(Gravity.CENTER);
         heading.setTextColor(Color.WHITE);
         heading.setPadding(dp(8), dp(6), dp(8), dp(6));
         TextView intro = text("Choose what you'd like to watch");
         intro.setTextSize(17);
+        intro.setGravity(Gravity.CENTER);
         intro.setTextColor(Color.rgb(195, 215, 245));
         intro.setPadding(dp(8), 0, 0, dp(14));
         root.addView(intro);
