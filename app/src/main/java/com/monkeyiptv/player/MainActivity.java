@@ -518,7 +518,13 @@ public class MainActivity extends Activity {
                         String name = c.optString("category_name", "Other");
                         sidebarItem(name, false, () -> showItems(type, id));
                     }
-                    showItems(type, "");
+                    // Open a real category first instead of materializing every stream on entry.
+                    if (categories.length() > 0) {
+                        JSONObject first = categories.optJSONObject(0);
+                        if (first != null) showItems(type, first.optString("category_id", ""));
+                    } else {
+                        showItems(type, "");
+                    }
                 });
             } catch (Exception ex) {
                 runOnUiThread(() -> {
