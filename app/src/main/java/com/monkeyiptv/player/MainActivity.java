@@ -52,7 +52,56 @@ public class MainActivity extends Activity {
         getWindow().setNavigationBarColor(Color.rgb(10, 15, 31));
         username = getPreferences(0).getString("username", "");
         password = getPreferences(0).getString("password", "");
-        if (!username.isEmpty() && !password.isEmpty()) showHome(); else showLogin();
+        showSplash();
+    }
+
+    // Page 1: branded splash screen. No network requests or unnecessary loading delay.
+    private void showSplash() {
+        getWindow().getDecorView().setSystemUiVisibility(
+            View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION |
+            View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
+        android.widget.FrameLayout splash = new android.widget.FrameLayout(this);
+        splash.setBackground(new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+            new int[]{Color.rgb(1, 14, 37), Color.rgb(3, 37, 89), Color.rgb(1, 10, 29)}));
+        setContentView(splash);
+
+        LinearLayout center = new LinearLayout(this);
+        center.setOrientation(LinearLayout.VERTICAL);
+        center.setGravity(Gravity.CENTER);
+        center.setPadding(dp(24), dp(20), dp(24), dp(20));
+        android.widget.FrameLayout.LayoutParams centered = new android.widget.FrameLayout.LayoutParams(
+            -1, -2, Gravity.CENTER);
+        splash.addView(center, centered);
+
+        TextView mark = text("▶");
+        mark.setTextColor(Color.rgb(0, 160, 255));
+        mark.setTextSize(78);
+        mark.setGravity(Gravity.CENTER);
+        mark.setPadding(0, 0, 0, dp(2));
+        center.addView(mark);
+
+        TextView name = text("DREAM IPTV");
+        name.setTypeface(Typeface.DEFAULT_BOLD);
+        name.setTextSize(39);
+        name.setGravity(Gravity.CENTER);
+        name.setPadding(0, 0, 0, dp(4));
+        center.addView(name);
+
+        TextView tagline = text("L I V E   ·   M O V I E S   ·   S E R I E S");
+        tagline.setTextSize(12);
+        tagline.setTextColor(Color.rgb(195, 218, 244));
+        tagline.setGravity(Gravity.CENTER);
+        center.addView(tagline);
+
+        splash.setFocusableInTouchMode(true);
+        splash.requestFocus();
+        final Runnable continueToApp = () -> {
+            if (isFinishing() || isDestroyed()) return;
+            getWindow().getDecorView().setSystemUiVisibility(0);
+            if (!username.isEmpty() && !password.isEmpty()) showHome();
+            else showLogin();
+        };
+        new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(continueToApp, 1400);
     }
 
     private TextView text(String value) {
