@@ -815,13 +815,27 @@ public class MainActivity extends Activity {
 
     private void play(String type, String id, String ext) {
         releasePlayer();
-        screen("Now playing");
-        button("← Back", () -> { releasePlayer(); if (type.equals("live")) showItems("live", currentCategory); else showCategories(type); });
+        setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+        getWindow().getDecorView().setSystemUiVisibility(
+            View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION |
+            View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY | View.SYSTEM_UI_FLAG_LAYOUT_STABLE |
+            View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION);
+        android.widget.FrameLayout movieScreen = new android.widget.FrameLayout(this);
+        movieScreen.setBackgroundColor(Color.BLACK);
+        setContentView(movieScreen);
         PlayerView view = new PlayerView(this);
-        root.addView(view, new LinearLayout.LayoutParams(-1, getResources().getDisplayMetrics().heightPixels * 2 / 3));
-        addFullscreenToggle(view);
+        view.setUseController(true);
+        view.setControllerShowTimeoutMs(4000);
+        view.setResizeMode(androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT);
+        movieScreen.addView(view, new android.widget.FrameLayout.LayoutParams(-1, -1));
         player = new ExoPlayer.Builder(this).build();
         view.setPlayer(player);
+        TextView playbackStatus = text("Connecting to stream...");
+        playbackStatus.setTextSize(14);
+        playbackStatus.setBackgroundColor(Color.argb(170, 10, 16, 28));
+        android.widget.FrameLayout.LayoutParams statusParams = new android.widget.FrameLayout.LayoutParams(
+            -2, -2, Gravity.TOP | Gravity.CENTER_HORIZONTAL);
+        movieScreen.addView(playbackStatus, statusParams);
         String folder = type.equals("vod") ? "movie" : type;
         String safeExt = ext.matches("[a-zA-Z0-9]{1,5}") ? ext : "mp4";
         String stream = server + "/" + folder + "/" + path(username) + "/" + path(password) + "/" + path(id) + "." + safeExt;
@@ -1066,7 +1080,12 @@ public class MainActivity extends Activity {
     @Override protected void onDestroy() { if (updateReceiver != null) { unregisterReceiver(updateReceiver); updateReceiver = null; } super.onDestroy(); }
     @Override protected void onStop() { super.onStop(); releasePlayer(); }
     @Override public void onBackPressed() {
-        if (player != null) { releasePlayer(); if (currentType.equals("live")) showItems("live", currentCategory); else showCategories(currentType); }
+        if (player != null) {
+            releasePlayer();
+            setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
+            getWindow().getDecorView().setSystemUiVisibility(0);
+            if (currentType.equals("live")) showItems("live", currentCategory); else showCategories(currentType);
+        }
         else if (!username.isEmpty()) showHome(); else super.onBackPressed();
     }
 }
