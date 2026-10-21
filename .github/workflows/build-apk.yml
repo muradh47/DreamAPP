@@ -1,14 +1,14 @@
-name: Android APK
+name: Dream IPTV APK
 on:
   push:
     branches: [master, main]
   pull_request:
   workflow_dispatch:
+permissions:
+  contents: write
 jobs:
   build:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -18,18 +18,9 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.11.1'
-      - name: Build debug APK
-        run: gradle :app:assembleDebug --no-daemon
-      - uses: actions/upload-artifact@v4
-        with:
-          name: monkey-iptv-debug-apk
-          path: app/build/outputs/apk/debug/*.apk
-
-      - name: Publish signed Dream IPTV update
-        if: github.ref == 'refs/heads/master'
-        continue-on-error: true
+      - name: Prepare release signing
+        if: github.event_name != 'pull_request'
         env:
-          GH_TOKEN: ${{ github.token }}
           SIGNING_KEY: ${{ secrets.APK_KEYSTORE_BASE64 }}
           STORE_PASS: ${{ secrets.APK_STORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.APK_KEY_ALIAS }}
@@ -39,17 +30,40 @@ jobs:
           set -euo pipefail
           test -n "$SIGNING_KEY" && test -n "$STORE_PASS" && test -n "$KEY_ALIAS" && test -n "$KEY_PASS"
           echo "$SIGNING_KEY" | base64 -d > "$RUNNER_TEMP/dream.keystore"
-          export DREAM_KEYSTORE_FILE="$RUNNER_TEMP/dream.keystore"
-          export APK_STORE_PASSWORD="$STORE_PASS"
-          export APK_KEY_ALIAS="$KEY_ALIAS"
-          export APK_KEY_PASSWORD="$KEY_PASS"
-          gradle :app:assembleRelease --no-daemon
-          gh release create v3.0.2 app/build/outputs/apk/release/app-release.apk --title "Dream IPTV v3.0.2 - Player Update" --notes "Original Dream IPTV with the integrated streamlined fullscreen player and fixed updater." --target "$GITHUB_SHA"
-
-      - name: Upload signed APK for testing
-        if: always()
+      - name: Build main Dream IPTV APK
+        if: github.event_name != 'pull_request'
+        env:
+          DREAM_KEYSTORE_FILE: ${{ runner.temp }}/dream.keystore
+          APK_STORE_PASSWORD: ${{ secrets.APK_STORE_PASSWORD }}
+          APK_KEY_ALIAS: ${{ secrets.APK_KEY_ALIAS }}
+          APK_KEY_PASSWORD: ${{ secrets.APK_KEY_PASSWORD }}
+        run: gradle :app:assembleRelease --no-daemon
+      - name: Build pull request test APK
+        if: github.event_name == 'pull_request'
+        run: gradle :app:assembleDebug --no-daemon
+      - name: Upload main APK
+        if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v4
         with:
-          name: dream-iptv-signed-release-apk
+          name: Dream-IPTV-APK
           path: app/build/outputs/apk/release/app-release.apk
-          if-no-files-found: ignore
+      - name: Upload pull request APK
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Dream-IPTV-PR-Test-APK
+          path: app/build/outputs/apk/debug/*.apk
+      - name: Publish Dream IPTV update
+        if: github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=app/build/outputs/apk/release/app-release.apk
+          TAG="v$(grep -o 'versionName = "[^"]*"' app/build.gradle.kts | head -1 | cut -d '"' -f2)"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$APK" --clobber
+          else
+            gh release create "$TAG" "$APK" --title "Dream IPTV $TAG" --notes "Original Dream IPTV with integrated fullscreen player and update fixes." --target "$GITHUB_SHA"
+          fi
