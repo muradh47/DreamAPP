@@ -207,9 +207,9 @@ public class MainActivity extends Activity {
         root.addView(intro);
 
         LinearLayout primary = row();
-        Button live = homeTile("▣\\nLIVE TV\\nWatch channels", Color.rgb(8, 80, 205), () -> showCategories("live"));
-        Button movies = homeTile("▶\\nMOVIES\\nWatch films", Color.rgb(197, 48, 39), () -> showCategories("vod"));
-        Button series = homeTile("▤\\nSERIES\\nTV shows & seasons", Color.rgb(105, 39, 170), () -> showCategories("series"));
+        Button live = homeTile("▣\nLIVE TV\nWatch channels", Color.rgb(8, 80, 205), () -> showCategories("live"));
+        Button movies = homeTile("▶\nMOVIES\nWatch films", Color.rgb(197, 48, 39), () -> showCategories("vod"));
+        Button series = homeTile("▤\nSERIES\nTV shows & seasons", Color.rgb(105, 39, 170), () -> showCategories("series"));
         addHomeTile(primary, live, 220);
         addHomeTile(primary, movies, 220);
         addHomeTile(primary, series, 220);
