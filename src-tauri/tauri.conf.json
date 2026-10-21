@@ -2,7 +2,7 @@
   "productName": "Dream IPTV",
   "mainBinaryName": "extreme-infinitv",
   "version": "1.9.0",
-  "identifier": "com.infinitel8p.xtream",
+  "identifier": "com.dreamiptv.player",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:4321",
