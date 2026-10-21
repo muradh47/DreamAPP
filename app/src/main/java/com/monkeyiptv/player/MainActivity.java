@@ -44,6 +44,7 @@ public class MainActivity extends Activity {
     private Uri pendingUpdateApk;
     private BroadcastReceiver updateReceiver;
     private boolean updateCheckedThisSession = false;
+    private TextView updateStatusView;
     private static final String RELEASES_API = "https://api.github.com/repos/muradh47/MonkeyIPTV/releases/tags/v3.0.1";
 
     @Override public void onCreate(Bundle state) {
@@ -114,6 +115,7 @@ public class MainActivity extends Activity {
 
     private void showLogin() {
         screen("DREAM IPTV");
+        updateStatusView = null;
         TextView welcome = text("Welcome to Dream IPTV");
         welcome.setTextSize(26);
         welcome.setGravity(Gravity.CENTER);
@@ -887,7 +889,11 @@ public class MainActivity extends Activity {
     }
 
     private void checkUpdates() {
+        if (updateStatusView != null && updateStatusView.getParent() instanceof android.view.ViewGroup) {
+            ((android.view.ViewGroup) updateStatusView.getParent()).removeView(updateStatusView);
+        }
         TextView status = text("Checking for updates...");
+        updateStatusView = status;
         root.addView(status);
         new Thread(() -> {
             try {
@@ -916,7 +922,12 @@ public class MainActivity extends Activity {
                     status.setText("New version " + tag + " available (installed: " + BuildConfig.VERSION_NAME + ")");
                     button("DOWNLOAD UPDATE", () -> downloadUpdate(url, status));
                 });
-            } catch (Exception e) { runOnUiThread(() -> status.setText("Update check failed: " + e.getMessage())); }
+            } catch (Exception e) { runOnUiThread(() -> {
+                if (status != updateStatusView) return;
+                if (e.getMessage() != null && e.getMessage().contains("404"))
+                    status.setText("No Dream IPTV update published yet.");
+                else status.setText("Unable to check for updates. Try again later.");
+            }); }
         }).start();
     }
 
