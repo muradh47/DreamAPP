@@ -44,7 +44,7 @@ public class MainActivity extends Activity {
     private Uri pendingUpdateApk;
     private BroadcastReceiver updateReceiver;
     private boolean updateCheckedThisSession = false;
-    private static final String RELEASES_API = "https://api.github.com/repos/muradh47/MonkeyIPTV/releases/latest";
+    private static final String RELEASES_API = "https://api.github.com/repos/muradh47/MonkeyIPTV/releases/tags/v3.0.1";
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
@@ -213,7 +213,8 @@ public class MainActivity extends Activity {
         });
         if (!updateCheckedThisSession) {
             updateCheckedThisSession = true;
-            checkUpdates();
+            // Only check when a verified Dream IPTV release has been published.
+            // The CHECK UPDATES tile remains available for manual checks.
         }
     }
 
@@ -860,8 +861,10 @@ public class MainActivity extends Activity {
                     }
                 }
                 final String url = apkUrl;
+                final String releaseName = release.optString("name", "");
+                final boolean verifiedDreamRelease = tag.equals("3.0.1") && releaseName.startsWith("Dream IPTV v3.0.1");
                 runOnUiThread(() -> {
-                    if (tag.isEmpty()) { status.setText("No published release found."); return; }
+                    if (!verifiedDreamRelease) { status.setText("No verified Dream IPTV update available yet."); return; }
                     if (compareVersions(tag, BuildConfig.VERSION_NAME) <= 0) {
                         status.setText("Up to date (" + BuildConfig.VERSION_NAME + ")"); return;
                     }
