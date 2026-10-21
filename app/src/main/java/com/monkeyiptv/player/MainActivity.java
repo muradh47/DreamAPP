@@ -193,39 +193,42 @@ public class MainActivity extends Activity {
         setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
         getWindow().getDecorView().setSystemUiVisibility(0);
         screen("DREAM IPTV");
-        root.setPadding(dp(20), dp(12), dp(20), dp(20));
+        root.setPadding(dp(28), dp(12), dp(28), dp(20));
         root.setGravity(Gravity.CENTER_VERTICAL);
         root.setBackground(new GradientDrawable(GradientDrawable.Orientation.TL_BR,
-            new int[]{Color.rgb(6, 31, 82), Color.rgb(9, 18, 44), Color.rgb(5, 13, 31)}));
+            new int[]{Color.rgb(5, 22, 56), Color.rgb(8, 16, 37), Color.rgb(4, 12, 29)}));
         TextView heading = (TextView) root.getChildAt(0);
-        heading.setTextSize(32);
+        heading.setTextSize(30);
         heading.setGravity(Gravity.CENTER);
         heading.setTextColor(Color.WHITE);
-        heading.setPadding(dp(8), dp(6), dp(8), dp(6));
-        TextView intro = text("Choose what you'd like to watch");
-        intro.setTextSize(17);
+        heading.setPadding(dp(8), dp(4), dp(8), dp(4));
+        TextView intro = text("Select an option to continue");
+        intro.setTextSize(16);
         intro.setGravity(Gravity.CENTER);
-        intro.setTextColor(Color.rgb(195, 215, 245));
-        intro.setPadding(dp(8), 0, 0, dp(14));
+        intro.setTextColor(Color.rgb(192, 211, 237));
+        intro.setPadding(dp(8), 0, dp(8), dp(12));
         root.addView(intro);
 
-        LinearLayout primary = row();
-        Button live = homeTile("▣\nLIVE TV\nWatch channels", Color.rgb(8, 80, 205), () -> showCategories("live"));
-        Button movies = homeTile("▶\nMOVIES\nWatch films", Color.rgb(197, 48, 39), () -> showCategories("vod"));
-        Button series = homeTile("▤\nSERIES\nTV shows & seasons", Color.rgb(105, 39, 170), () -> showCategories("series"));
-        addHomeTile(primary, live, 220);
-        addHomeTile(primary, movies, 220);
-        addHomeTile(primary, series, 220);
+        // Familiar TV launcher: four large, equally sized choices in a 2 × 2 grid.
+        LinearLayout first = row();
+        Button live = homeTile("▣\\nLIVE TV", Color.rgb(11, 77, 164), () -> showCategories("live"));
+        addHomeTile(first, live, 136);
+        addHomeTile(first, homeTile("▶\\nMOVIES", Color.rgb(18, 79, 146),
+            () -> showCategories("vod")), 136);
 
-        LinearLayout secondary = row();
-        addHomeTile(secondary, homeTile("◷  CATCH UP", Color.rgb(25, 52, 91),
-            () -> showCategories("live")), 100);
-        addHomeTile(secondary, homeTile("▦  TV GUIDE", Color.rgb(25, 52, 91),
-            this::showGuide), 100);
-        addHomeTile(secondary, homeTile("♡  FAVOURITES", Color.rgb(25, 52, 91),
-            () -> showCategories("live")), 100);
-        addHomeTile(secondary, homeTile("⚙  SETTINGS", Color.rgb(25, 52, 91),
-            this::showHomeSettings), 100);
+        LinearLayout second = row();
+        addHomeTile(second, homeTile("▤\\nSERIES", Color.rgb(24, 70, 131),
+            () -> showCategories("series")), 136);
+        addHomeTile(second, homeTile("◷\\nCATCH UP", Color.rgb(28, 64, 117),
+            () -> showCategories("live")), 136);
+
+        LinearLayout shortcuts = row();
+        addHomeTile(shortcuts, homeTile("▦  TV GUIDE", Color.rgb(21, 42, 76),
+            this::showGuide), 72);
+        addHomeTile(shortcuts, homeTile("♡  FAVOURITES", Color.rgb(21, 42, 76),
+            () -> showCategories("live")), 72);
+        addHomeTile(shortcuts, homeTile("⚙  SETTINGS", Color.rgb(21, 42, 76),
+            this::showHomeSettings), 72);
         live.requestFocus();
     }
 
