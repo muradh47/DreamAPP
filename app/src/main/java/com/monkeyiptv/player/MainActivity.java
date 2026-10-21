@@ -211,15 +211,15 @@ public class MainActivity extends Activity {
 
         // Familiar TV launcher: four large, equally sized choices in a 2 × 2 grid.
         LinearLayout first = row();
-        Button live = homeTile("▣\\nLIVE TV", Color.rgb(11, 77, 164), () -> showCategories("live"));
+        Button live = homeTile("▣\nLIVE TV", Color.rgb(11, 77, 164), () -> showCategories("live"));
         addHomeTile(first, live, 136);
-        addHomeTile(first, homeTile("▶\\nMOVIES", Color.rgb(18, 79, 146),
+        addHomeTile(first, homeTile("▶\nMOVIES", Color.rgb(18, 79, 146),
             () -> showCategories("vod")), 136);
 
         LinearLayout second = row();
-        addHomeTile(second, homeTile("▤\\nSERIES", Color.rgb(24, 70, 131),
+        addHomeTile(second, homeTile("▤\nSERIES", Color.rgb(24, 70, 131),
             () -> showCategories("series")), 136);
-        addHomeTile(second, homeTile("◷\\nCATCH UP", Color.rgb(28, 64, 117),
+        addHomeTile(second, homeTile("◷\nCATCH UP", Color.rgb(28, 64, 117),
             () -> showCategories("live")), 136);
 
         LinearLayout shortcuts = row();
@@ -887,16 +887,24 @@ public class MainActivity extends Activity {
         };
 
     private void loadArtwork(String url, ImageView target) {
-        if (url == null || !(url.startsWith("https://") || url.startsWith("http://"))) return;
-        target.setTag(url);
-        Bitmap cached = artworkCache.get(url);
+        if (url == null || url.trim().isEmpty() || url.equalsIgnoreCase("null")) return;
+        url = url.trim().replace("&amp;", "&");
+        if (url.startsWith("//")) url = "https:" + url;
+        else if (url.startsWith("/")) url = server + url;
+        else if (!url.startsWith("https://") && !url.startsWith("http://")) {
+            if (url.contains("://")) return;
+            url = server + "/" + url;
+        }
+        final String imageUrl = url;
+        target.setTag(imageUrl);
+        Bitmap cached = artworkCache.get(imageUrl);
         if (cached != null) { target.setImageBitmap(cached); return; }
         artworkExecutor.execute(() -> {
             try {
                 java.io.File directory = new java.io.File(getCacheDir(), "channel-art");
                 if (!directory.exists()) directory.mkdirs();
                 String key = bytesToHex(java.security.MessageDigest.getInstance("SHA-256")
-                        .digest(url.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+                        .digest(imageUrl.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
                 java.io.File file = new java.io.File(directory, key + ".img");
                 Bitmap bitmap = null;
                 if (file.isFile() && file.length() > 0) {
@@ -905,10 +913,12 @@ public class MainActivity extends Activity {
                     bitmap = BitmapFactory.decodeFile(file.getAbsolutePath(), opts);
                 }
                 if (bitmap == null) {
-                    HttpURLConnection connection = (HttpURLConnection) new java.net.URL(url).openConnection();
+                    HttpURLConnection connection = (HttpURLConnection) new java.net.URL(imageUrl).openConnection();
                     connection.setConnectTimeout(2500);
                     connection.setReadTimeout(3500);
                     connection.setInstanceFollowRedirects(true);
+                    connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Android; Dream IPTV)");
+                    connection.setRequestProperty("Accept", "image/*");
                     try (InputStream input = connection.getInputStream();
                          java.io.FileOutputStream output = new java.io.FileOutputStream(file)) {
                         byte[] buffer = new byte[8192];
@@ -921,10 +931,10 @@ public class MainActivity extends Activity {
                     if (bitmap == null) file.delete();
                 }
                 if (bitmap == null) return;
-                artworkCache.put(url, bitmap);
+                artworkCache.put(imageUrl, bitmap);
                 Bitmap ready = bitmap;
                 runOnUiThread(() -> {
-                    if (url.equals(target.getTag())) target.setImageBitmap(ready);
+                    if (imageUrl.equals(target.getTag())) target.setImageBitmap(ready);
                 });
             } catch (Exception ignored) { }
         });
