@@ -253,14 +253,14 @@ public class MainActivity extends Activity {
         if (rememberEnabled) {
             user.setText(prefs.getString("saved_username", ""));
         }
+        EditText pass = loginField("Password", true);
+        if (rememberEnabled) pass.setText(prefs.getString("saved_password", ""));
         CheckBox remember = new CheckBox(this);
         remember.setText("Remember username and password");
         remember.setTextColor(Color.rgb(205, 225, 246));
         remember.setTextSize(14);
         remember.setChecked(rememberEnabled);
         root.addView(remember);
-        EditText pass = loginField("Password", true);
-        if (rememberEnabled) pass.setText(prefs.getString("saved_password", ""));
         TextView status = text("");
         status.setGravity(Gravity.CENTER);
         root.addView(status);
