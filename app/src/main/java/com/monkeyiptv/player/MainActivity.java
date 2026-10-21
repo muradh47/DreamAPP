@@ -341,13 +341,13 @@ public class MainActivity extends Activity {
 
         LinearLayout primary = row();
         if (compact) primary.setOrientation(LinearLayout.VERTICAL);
-        Button live = homeTile("▣  LIVE TV",
+        Button live = homeTile("📺\nLIVE TV",
             Color.rgb(0, 88, 213), () -> showCategories("live"));
         addHomeTile(primary, live, compact ? 126 : 196);
-        addHomeTile(primary, homeTile("▶  MOVIES",
+        addHomeTile(primary, homeTile("🎬\nMOVIES",
             Color.rgb(219, 32, 45), () -> showCategories("vod")), compact ? 126 : 196);
-        addHomeTile(primary, homeTile("▤  SERIES",
-            Color.rgb(98, 14, 180), () -> showCategories("series")), 196);
+        addHomeTile(primary, homeTile("📚\nSERIES",
+            Color.rgb(98, 14, 180), () -> showCategories("series")), compact ? 126 : 196);
 
         LinearLayout shortcuts = row();
         if (compact) shortcuts.setOrientation(LinearLayout.VERTICAL);
