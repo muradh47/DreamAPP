@@ -8,6 +8,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
+      contents: write
+    permissions:
       contents: read
     steps:
       - uses: actions/checkout@v4
@@ -24,3 +26,23 @@ jobs:
         with:
           name: monkey-iptv-debug-apk
           path: app/build/outputs/apk/debug/*.apk
+
+      - name: Publish signed Dream IPTV update
+        if: github.ref == 'refs/heads/master'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SIGNING_KEY: ${{ secrets.APK_KEYSTORE_BASE64 }}
+          STORE_PASS: ${{ secrets.APK_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.APK_KEY_ALIAS }}
+          KEY_PASS: ${{ secrets.APK_KEY_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$SIGNING_KEY" && test -n "$STORE_PASS" && test -n "$KEY_ALIAS" && test -n "$KEY_PASS"
+          echo "$SIGNING_KEY" | base64 -d > "$RUNNER_TEMP/dream.keystore"
+          export DREAM_KEYSTORE_FILE="$RUNNER_TEMP/dream.keystore"
+          export APK_STORE_PASSWORD="$STORE_PASS"
+          export APK_KEY_ALIAS="$KEY_ALIAS"
+          export APK_KEY_PASSWORD="$KEY_PASS"
+          gradle :app:assembleRelease --no-daemon
+          gh release create v3.0.1 app/build/outputs/apk/release/app-release.apk --title "Dream IPTV v3.0.1 - Player Update" --notes "Original Dream IPTV with the integrated streamlined fullscreen player and fixed updater." --target "$GITHUB_SHA"
