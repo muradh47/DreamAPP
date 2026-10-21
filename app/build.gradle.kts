@@ -6,9 +6,25 @@ android {
         applicationId = "com.monkeyiptv.player"
         minSdk = 23
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 3000001
+        versionName = "3.0.1"
         buildConfigField("String", "SERVER_URL", "\"http://tvplug.xyz:8880\"")
+    }
+    signingConfigs {
+        create("dreamRelease") {
+            val keyFile = System.getenv("DREAM_KEYSTORE_FILE")
+            if (!keyFile.isNullOrBlank()) {
+                storeFile = file(keyFile)
+                storePassword = System.getenv("APK_STORE_PASSWORD")
+                keyAlias = System.getenv("APK_KEY_ALIAS")
+                keyPassword = System.getenv("APK_KEY_PASSWORD")
+            }
+        }
+    }
+    buildTypes {
+        getByName("release") {
+            signingConfig = signingConfigs.getByName("dreamRelease")
+        }
     }
     buildFeatures { buildConfig = true }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
