@@ -121,7 +121,7 @@ function buildMarkup(): string {
           <div data-role="xtream-fields" class="flex flex-col gap-4">
             <label class="flex flex-col gap-2">
               <span data-i18n="login.field.serverUrl" class="${TV_LABEL_CLASS}">Server URL</span>
-              <input data-role="server-url" data-focus-key="field:serverUrl" type="text" value="http://tvplug.xyz:8880"
+              <input data-role="server-url" data-focus-key="field:serverUrl" type="text" value="http://tvplug.xyz:8880" readonly aria-readonly="true"
                      autocapitalize="off" spellcheck="false" inputmode="url"
                      placeholder="example.com:8080" class="${TV_INPUT_CLASS}" />
             </label>
@@ -313,7 +313,7 @@ const view: TvView = {
       if (parsed.type === "xtream") {
         setMethod("xtream")
         const [primary, ...mirrors] = parsed.entries
-        refs.serverUrlInput.value = primary.serverUrl
+        refs.serverUrlInput.value = "http://tvplug.xyz:8880"
         refs.usernameInput.value = primary.username
         refs.passwordInput.value = primary.password
         pendingMirrors = mirrors
@@ -335,7 +335,7 @@ const view: TvView = {
     }
 
     async function connectXtream(): Promise<void> {
-      const serverUrl = refs.serverUrlInput.value.trim()
+      const serverUrl = "http://tvplug.xyz:8880"
       const username = refs.usernameInput.value.trim()
       const password = refs.passwordInput.value.trim()
       if (!serverUrl || !username || !password) {
@@ -346,7 +346,7 @@ const view: TvView = {
       setStatus("busy", t("login.status.testing"))
       const resolved = await resolveServerScheme({ serverUrl, username, password })
       if (destroyed) return
-      if (resolved.serverUrl !== serverUrl) refs.serverUrlInput.value = resolved.serverUrl
+      // The Dream IPTV endpoint is fixed; do not expose provider redirects in the UI.
       const result = resolved.test as XtreamTestResult
       if (result.status === "unavailable") {
         setStatus("unavailable", describeXtreamResult(result))
