@@ -839,8 +839,6 @@ public class MainActivity extends Activity {
         String folder = type.equals("vod") ? "movie" : type;
         String safeExt = ext.matches("[a-zA-Z0-9]{1,5}") ? ext : "mp4";
         String stream = server + "/" + folder + "/" + path(username) + "/" + path(password) + "/" + path(id) + "." + safeExt;
-        TextView playbackStatus = text("Connecting to stream...");
-        root.addView(playbackStatus);
         final String initialStream = stream;
         player.addListener(new Player.Listener() {
             private boolean retriedHls = false;
