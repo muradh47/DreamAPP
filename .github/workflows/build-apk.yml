@@ -27,6 +27,7 @@ jobs:
 
       - name: Publish signed Dream IPTV update
         if: github.ref == 'refs/heads/master'
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
           SIGNING_KEY: ${{ secrets.APK_KEYSTORE_BASE64 }}
