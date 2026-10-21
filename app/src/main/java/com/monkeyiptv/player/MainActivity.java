@@ -303,7 +303,7 @@ public class MainActivity extends Activity {
         });
         playerControls.addView(pauseButton, new LinearLayout.LayoutParams(0, dp(52), 1f));
         Button fitButton = new Button(this);
-        fitButton.setText("ZOOM");
+        fitButton.setText("ASPECT: FIT");
         fitButton.setAllCaps(false);
         fitButton.setFocusable(true);
         fitButton.setOnClickListener(v -> {
@@ -312,10 +312,22 @@ public class MainActivity extends Activity {
             fullscreenView.setResizeMode(zoom
                 ? androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_ZOOM
                 : androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT);
-            fitButton.setText(zoom ? "FIT" : "ZOOM");
+            fitButton.setText(zoom ? "ASPECT: ZOOM" : "ASPECT: FIT");
         });
         playerControls.addView(fitButton, new LinearLayout.LayoutParams(0, dp(52), 1f));
+        Button guideButton = new Button(this);
+        guideButton.setText("TV GUIDE");
+        guideButton.setFocusable(true);
+        guideButton.setOnClickListener(v -> {
+            releasePlayer();
+            getWindow().getDecorView().setSystemUiVisibility(0);
+            showGuide();
+        });
+        playerControls.addView(guideButton, new LinearLayout.LayoutParams(0, dp(52), 1f));
         overlay.addView(playerControls);
+        TextView playerStatus = text("Connecting to live stream...");
+        playerStatus.setTextSize(14);
+        overlay.addView(playerStatus);
         android.widget.ScrollView scroll = new android.widget.ScrollView(this);
         LinearLayout schedule = new LinearLayout(this);
         schedule.setOrientation(LinearLayout.VERTICAL);
@@ -352,6 +364,19 @@ public class MainActivity extends Activity {
         };
         epgHandler.post(epgRefresh);
         startStream("live", id, "ts", fullscreenView);
+        player.addListener(new Player.Listener() {
+            @Override public void onIsPlayingChanged(boolean playing) {
+                pauseButton.setText(playing ? "PAUSE" : "PLAY");
+            }
+            @Override public void onPlaybackStateChanged(int state) {
+                if (state == Player.STATE_READY) playerStatus.setText("");
+                else if (state == Player.STATE_BUFFERING) playerStatus.setText("Buffering...");
+            }
+            @Override public void onPlayerError(PlaybackException error) {
+                playerStatus.setText("Stream error: " + error.getErrorCodeName());
+            }
+        });
+        pauseButton.requestFocus();
     }
 
     private void showEpgInline(String id, String channel, boolean fromGuide) {
