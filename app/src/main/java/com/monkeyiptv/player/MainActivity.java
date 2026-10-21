@@ -190,26 +190,75 @@ public class MainActivity extends Activity {
 
     private void showHome() {
         releasePlayer();
+        setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
+        getWindow().getDecorView().setSystemUiVisibility(0);
         screen("DREAM IPTV");
-        root.addView(text("Your entertainment, your way"));
-        LinearLayout main = row();
-        addTile(main, "▣\nLIVE TV", Color.rgb(0, 148, 181), 242, () -> showCategories("live"));
-        LinearLayout right = new LinearLayout(this);
-        right.setOrientation(LinearLayout.VERTICAL);
-        main.addView(right, new LinearLayout.LayoutParams(0, -2, 2f));
-        LinearLayout top = new LinearLayout(this);
-        right.addView(top);
-        addTile(top, "▶\nMOVIES", Color.rgb(221, 78, 39), 145, () -> showCategories("vod"));
-        addTile(top, "▤\nSERIES", Color.rgb(112, 77, 187), 145, () -> showCategories("series"));
-        LinearLayout lower = new LinearLayout(this);
-        right.addView(lower);
-        addTile(lower, "TV GUIDE", Color.rgb(37, 134, 109), 87, this::showGuide);
-        addTile(lower, "CATCH UP", Color.rgb(36, 120, 97), 87, () -> showCategories("live"));
-        LinearLayout tools = row();
-        addTile(tools, "CHECK UPDATES", Color.rgb(38, 57, 89), 88, this::checkUpdates);
-        addTile(tools, "LOG OUT", Color.rgb(38, 57, 89), 88, () -> {
+        root.setPadding(dp(20), dp(12), dp(20), dp(20));
+        root.setBackground(new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+            new int[]{Color.rgb(6, 31, 82), Color.rgb(9, 18, 44), Color.rgb(5, 13, 31)}));
+        TextView heading = (TextView) root.getChildAt(0);
+        heading.setTextSize(32);
+        heading.setTextColor(Color.WHITE);
+        heading.setPadding(dp(8), dp(6), dp(8), dp(6));
+        TextView intro = text("Choose what you'd like to watch");
+        intro.setTextSize(17);
+        intro.setTextColor(Color.rgb(195, 215, 245));
+        intro.setPadding(dp(8), 0, 0, dp(14));
+        root.addView(intro);
+
+        LinearLayout primary = row();
+        Button live = homeTile("▣\\nLIVE TV\\nWatch channels", Color.rgb(8, 80, 205), () -> showCategories("live"));
+        Button movies = homeTile("▶\\nMOVIES\\nWatch films", Color.rgb(197, 48, 39), () -> showCategories("vod"));
+        Button series = homeTile("▤\\nSERIES\\nTV shows & seasons", Color.rgb(105, 39, 170), () -> showCategories("series"));
+        addHomeTile(primary, live, 220);
+        addHomeTile(primary, movies, 220);
+        addHomeTile(primary, series, 220);
+
+        LinearLayout secondary = row();
+        addHomeTile(secondary, homeTile("◷  CATCH UP", Color.rgb(25, 52, 91),
+            () -> showCategories("live")), 100);
+        addHomeTile(secondary, homeTile("▦  TV GUIDE", Color.rgb(25, 52, 91),
+            this::showGuide), 100);
+        addHomeTile(secondary, homeTile("♡  FAVOURITES", Color.rgb(25, 52, 91),
+            () -> showCategories("live")), 100);
+        addHomeTile(secondary, homeTile("⚙  SETTINGS", Color.rgb(25, 52, 91),
+            this::showHomeSettings), 100);
+        live.requestFocus();
+    }
+
+    private Button homeTile(String label, int color, Runnable action) {
+        Button tile = tile(label, color, action);
+        tile.setTextSize(21);
+        tile.setLineSpacing(dp(4), 1f);
+        tile.setOnFocusChangeListener((view, focused) -> {
+            GradientDrawable background = new GradientDrawable(
+                GradientDrawable.Orientation.TL_BR,
+                new int[]{focused ? Color.rgb(28, 116, 245) : color, darken(color)});
+            background.setCornerRadius(dp(18));
+            background.setStroke(dp(focused ? 3 : 1),
+                focused ? Color.rgb(110, 210, 255) : Color.rgb(55, 86, 132));
+            tile.setBackground(background);
+            tile.setScaleX(focused ? 1.02f : 1f);
+            tile.setScaleY(focused ? 1.02f : 1f);
+        });
+        return tile;
+    }
+
+    private void addHomeTile(LinearLayout parent, Button tile, int height) {
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dp(height), 1f);
+        params.setMargins(dp(5), dp(5), dp(5), dp(5));
+        parent.addView(tile, params);
+    }
+
+    private void showHomeSettings() {
+        screen("SETTINGS");
+        button("← HOME", this::showHome);
+        button("CHECK FOR UPDATES", this::checkUpdates);
+        button("LOG OUT", () -> {
             getPreferences(0).edit().remove("username").remove("password").apply();
-            username = ""; password = ""; showLogin();
+            username = "";
+            password = "";
+            showLogin();
         });
     }
 
