@@ -755,6 +755,7 @@ public class MainActivity extends Activity {
         page.setOrientation(LinearLayout.VERTICAL);
         page.setBackgroundColor(Color.rgb(11, 16, 35));
         setContentView(page);
+        getWindow().getDecorView().setSystemUiVisibility(0);
         LinearLayout header = new LinearLayout(this);
         header.setGravity(Gravity.CENTER_VERTICAL);
         header.setPadding(dp(12), dp(8), dp(12), dp(8));
@@ -800,10 +801,6 @@ public class MainActivity extends Activity {
     private final java.util.Map<String, JSONArray> itemCache = new java.util.LinkedHashMap<>();
 
     private void showCategories(String type) {
-        if ("live".equals(type)) {
-            showLiveCategories();
-            return;
-        }
         currentType = type;
         ++browseRequest;
         screen(type.equals("live") ? "LIVE TV  •  CATEGORIES" :
@@ -843,53 +840,6 @@ public class MainActivity extends Activity {
                 });
             }
         }).start();
-    }
-
-    private void showLiveCategories() {
-        currentType = "live";
-        browserShell("live");
-        browserHeading.setText("ALL CHANNELS");
-        renderLiveSidebar(categoryCache.get("live"), "");
-        showItems("live", "");
-        if (categoryCache.get("live") != null) return;
-        new Thread(() -> {
-            try {
-                JSONArray categories = new JSONArray(fetch(api(username, password, "get_live_categories")));
-                categoryCache.put("live", categories);
-                runOnUiThread(() -> {
-                    if (!"live".equals(currentType) || categorySidebar.getParent() == null) return;
-                    renderLiveSidebar(categories, currentCategory);
-                });
-            } catch (Exception ex) {
-                runOnUiThread(() -> {
-                    if ("live".equals(currentType) && categorySidebar.getParent() != null)
-                        sidebarItem("Retry categories", false, this::showLiveCategories);
-                });
-            }
-        }).start();
-    }
-
-    private void renderLiveSidebar(JSONArray categories, String selectedId) {
-        categorySidebar.removeAllViews();
-        sidebarItem("📺 ALL CHANNELS", selectedId.isEmpty(),
-            () -> selectLiveCategory("", "ALL CHANNELS"));
-        if (categories == null) {
-            sidebarItem("Loading...", false, () -> {});
-            return;
-        }
-        for (int i = 0; i < categories.length(); i++) {
-            JSONObject c = categories.optJSONObject(i);
-            if (c == null) continue;
-            String id = c.optString("category_id");
-            String name = c.optString("category_name", "Other");
-            sidebarItem(name, id.equals(selectedId), () -> selectLiveCategory(id, name));
-        }
-    }
-
-    private void selectLiveCategory(String id, String name) {
-        browserHeading.setText(name);
-        renderLiveSidebar(categoryCache.get("live"), id);
-        showItems("live", id);
     }
 
     private void renderCategoryTiles(String type, JSONArray categories, GridLayout grid) {
