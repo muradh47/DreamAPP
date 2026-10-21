@@ -45,7 +45,7 @@ public class MainActivity extends Activity {
     private BroadcastReceiver updateReceiver;
     private boolean updateCheckedThisSession = false;
     private TextView updateStatusView;
-    private static final String RELEASES_API = "https://api.github.com/repos/muradh47/MonkeyIPTV/releases/latest";
+    private static final String RELEASES_API = "https://api.github.com/repos/muradh47/DreamAPP/releases/latest";
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
