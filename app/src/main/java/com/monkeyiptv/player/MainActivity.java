@@ -346,7 +346,7 @@ public class MainActivity extends Activity {
         addHomeTile(primary, live, compact ? 126 : 196);
         addHomeTile(primary, homeTile("🎬\nMOVIES",
             Color.rgb(219, 32, 45), () -> showCategories("vod")), compact ? 126 : 196);
-        addHomeTile(primary, homeTile("📚\nSERIES",
+        addHomeTile(primary, homeTile("🎭\nSERIES",
             Color.rgb(98, 14, 180), () -> showCategories("series")), compact ? 126 : 196);
 
         LinearLayout shortcuts = row();
