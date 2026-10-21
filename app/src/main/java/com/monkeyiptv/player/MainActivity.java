@@ -278,6 +278,38 @@ public class MainActivity extends Activity {
         overlay.addView(now);
         TextView next = text("NEXT  •  Loading...");
         overlay.addView(next);
+        // Dream IPTV player controls: TV remote focusable and touch friendly.
+        LinearLayout playerControls = new LinearLayout(this);
+        playerControls.setOrientation(LinearLayout.HORIZONTAL);
+        Button pauseButton = new Button(this);
+        pauseButton.setText("PAUSE");
+        pauseButton.setAllCaps(false);
+        pauseButton.setFocusable(true);
+        pauseButton.setOnClickListener(v -> {
+            if (player == null) return;
+            if (player.isPlaying()) {
+                player.pause();
+                pauseButton.setText("PLAY");
+            } else {
+                player.play();
+                pauseButton.setText("PAUSE");
+            }
+        });
+        playerControls.addView(pauseButton, new LinearLayout.LayoutParams(0, dp(52), 1f));
+        Button fitButton = new Button(this);
+        fitButton.setText("ZOOM");
+        fitButton.setAllCaps(false);
+        fitButton.setFocusable(true);
+        fitButton.setOnClickListener(v -> {
+            boolean zoom = fullscreenView.getResizeMode()
+                == androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT;
+            fullscreenView.setResizeMode(zoom
+                ? androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+                : androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT);
+            fitButton.setText(zoom ? "FIT" : "ZOOM");
+        });
+        playerControls.addView(fitButton, new LinearLayout.LayoutParams(0, dp(52), 1f));
+        overlay.addView(playerControls);
         android.widget.ScrollView scroll = new android.widget.ScrollView(this);
         LinearLayout schedule = new LinearLayout(this);
         schedule.setOrientation(LinearLayout.VERTICAL);
