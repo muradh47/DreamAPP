@@ -45,7 +45,7 @@ public class MainActivity extends Activity {
     private BroadcastReceiver updateReceiver;
     private boolean updateCheckedThisSession = false;
     private TextView updateStatusView;
-    private static final String RELEASES_API = "https://api.github.com/repos/muradh47/MonkeyIPTV/releases/tags/v3.0.1";
+    private static final String RELEASES_API = "https://api.github.com/repos/muradh47/MonkeyIPTV/releases/latest";
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
@@ -909,7 +909,7 @@ public class MainActivity extends Activity {
                 }
                 final String url = apkUrl;
                 final String releaseName = release.optString("name", "");
-                final boolean verifiedDreamRelease = tag.equals("3.0.1") && releaseName.startsWith("Dream IPTV v3.0.1");
+                final boolean verifiedDreamRelease = releaseName.startsWith("Dream IPTV v") && !releaseName.contains("OpenTV") && tag.startsWith("3.");
                 runOnUiThread(() -> {
                     if (!verifiedDreamRelease) { status.setText("No verified Dream IPTV update available yet."); return; }
                     if (compareVersions(tag, BuildConfig.VERSION_NAME) <= 0) {
