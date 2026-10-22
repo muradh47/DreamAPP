@@ -795,6 +795,7 @@ public class MainActivity extends Activity {
     private PlayerView liveDashboardPreview;
     private TextView liveDashboardNow, liveDashboardNext, liveDashboardTitle;
     private String liveDashboardSelectedId = "", liveDashboardSelectedName = "";
+    private final java.util.Map<String, LinearLayout> liveDashboardCards = new java.util.HashMap<>();
     private int liveDashboardRequest = 0;
 
     private void showLiveDashboard() {
@@ -802,6 +803,9 @@ public class MainActivity extends Activity {
         currentType = "live";
         ++browseRequest;
         ++liveDashboardRequest;
+        liveDashboardCards.clear();
+        liveDashboardSelectedId = "";
+        liveDashboardSelectedName = "";
         setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
         getWindow().getDecorView().setSystemUiVisibility(0);
         LinearLayout page = new LinearLayout(this);
@@ -919,6 +923,7 @@ public class MainActivity extends Activity {
     private void selectLiveDashboardCategory(String categoryId, String label) {
         int request = ++liveDashboardRequest;
         liveDashboardChannels.removeAllViews();
+        liveDashboardCards.clear();
         liveDashboardChannels.addView(text("Loading " + label + "..."));
         new Thread(() -> {
             try {
@@ -943,8 +948,29 @@ public class MainActivity extends Activity {
                         card.setFocusable(true);
                         card.setClickable(true);
                         card.setOnClickListener(v -> previewLiveDashboardChannel(id, name));
+                        android.view.GestureDetector taps = new android.view.GestureDetector(this,
+                            new android.view.GestureDetector.SimpleOnGestureListener() {
+                                @Override public boolean onDown(android.view.MotionEvent event) { return true; }
+                                @Override public boolean onSingleTapConfirmed(android.view.MotionEvent event) {
+                                    previewLiveDashboardChannel(id, name);
+                                    return true;
+                                }
+                                @Override public boolean onDoubleTap(android.view.MotionEvent event) {
+                                    if (!id.equals(liveDashboardSelectedId))
+                                        previewLiveDashboardChannel(id, name);
+                                    showFullscreenLive(id, name, false);
+                                    return true;
+                                }
+                            });
+                        card.setOnTouchListener((v, event) -> {
+                            taps.onTouchEvent(event);
+                            return true;
+                        });
                         card.setOnFocusChangeListener((v, focused) ->
-                            card.setBackgroundColor(focused ? Color.rgb(48, 91, 192) : Color.rgb(25, 38, 65)));
+                            card.setBackgroundColor(id.equals(liveDashboardSelectedId)
+                                ? Color.rgb(17, 122, 194)
+                                : focused ? Color.rgb(48, 91, 192) : Color.rgb(25, 38, 65)));
+                        liveDashboardCards.put(id, card);
                         ImageView logo = new ImageView(this);
                         logo.setImageResource(android.R.drawable.ic_media_play);
                         logo.setScaleType(ImageView.ScaleType.FIT_CENTER);
@@ -987,6 +1013,11 @@ public class MainActivity extends Activity {
         releasePlayer();
         liveDashboardSelectedId = id;
         liveDashboardSelectedName = name;
+        for (java.util.Map.Entry<String, LinearLayout> entry : liveDashboardCards.entrySet()) {
+            boolean playing = id.equals(entry.getKey());
+            entry.getValue().setBackgroundColor(playing ? Color.rgb(17, 122, 194) : Color.rgb(25, 38, 65));
+            entry.getValue().setContentDescription((playing ? "NOW PLAYING: " : "") + entry.getKey());
+        }
         liveDashboardTitle.setText(name);
         liveDashboardNow.setText("NOW  •  Loading...");
         liveDashboardNext.setText("NEXT  •  Loading...");
