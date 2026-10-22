@@ -1595,7 +1595,9 @@ public class MainActivity extends Activity {
         view.setControllerShowTimeoutMs(4000);
         view.setResizeMode(androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT);
         movieScreen.addView(view, new android.widget.FrameLayout.LayoutParams(-1, -1));
-        player = new ExoPlayer.Builder(this).build();
+        player = new ExoPlayer.Builder(this, new androidx.media3.exoplayer.DefaultRenderersFactory(this)
+            .setEnableDecoderFallback(true)
+            .setExtensionRendererMode(androidx.media3.exoplayer.DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)).build();
         view.setPlayer(player);
         TextView playbackStatus = text("Connecting to stream...");
         playbackStatus.setTextSize(14);
@@ -1630,7 +1632,9 @@ public class MainActivity extends Activity {
     }
 
     private void startStream(String type, String id, String ext, PlayerView view) {
-        player = new ExoPlayer.Builder(this).build();
+        player = new ExoPlayer.Builder(this, new androidx.media3.exoplayer.DefaultRenderersFactory(this)
+            .setEnableDecoderFallback(true)
+            .setExtensionRendererMode(androidx.media3.exoplayer.DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)).build();
         view.setPlayer(player);
         String folder = type.equals("vod") ? "movie" : type;
         String safeExt = ext.matches("[a-zA-Z0-9]{1,5}") ? ext : "mp4";
