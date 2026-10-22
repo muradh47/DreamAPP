@@ -342,7 +342,7 @@ public class MainActivity extends Activity {
         LinearLayout primary = row();
         if (compact) primary.setOrientation(LinearLayout.VERTICAL);
         Button live = homeTile("📺\nLIVE TV",
-            Color.rgb(0, 88, 213), () -> showCategories("live"));
+            Color.rgb(0, 88, 213), () -> showLiveDashboard());
         addHomeTile(primary, live, compact ? 126 : 196);
         addHomeTile(primary, homeTile("🎬\nMOVIES",
             Color.rgb(219, 32, 45), () -> showCategories("vod")), compact ? 126 : 196);
@@ -788,6 +788,215 @@ public class MainActivity extends Activity {
 
     private final java.util.Map<String, JSONArray> categoryCache = new java.util.HashMap<>();
     private final java.util.Map<String, JSONArray> itemCache = new java.util.LinkedHashMap<>();
+
+    // Live TV dashboard: categories, video preview, EPG and channel cards in one view.
+    private LinearLayout liveDashboardCategories;
+    private GridLayout liveDashboardChannels;
+    private PlayerView liveDashboardPreview;
+    private TextView liveDashboardNow, liveDashboardNext, liveDashboardTitle;
+    private String liveDashboardSelectedId = "", liveDashboardSelectedName = "";
+    private int liveDashboardRequest = 0;
+
+    private void showLiveDashboard() {
+        releasePlayer();
+        currentType = "live";
+        ++browseRequest;
+        ++liveDashboardRequest;
+        setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
+        getWindow().getDecorView().setSystemUiVisibility(0);
+        LinearLayout page = new LinearLayout(this);
+        page.setOrientation(LinearLayout.VERTICAL);
+        page.setFitsSystemWindows(true);
+        page.setBackgroundColor(Color.rgb(9, 17, 37));
+        setContentView(page);
+        LinearLayout header = new LinearLayout(this);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        header.setPadding(dp(12), dp(5), dp(12), dp(5));
+        page.addView(header, new LinearLayout.LayoutParams(-1, dp(56)));
+        Button home = tile("‹ HOME", Color.rgb(25, 42, 75), this::showHome);
+        header.addView(home, new LinearLayout.LayoutParams(dp(100), dp(46)));
+        TextView brand = text("  DREAM IPTV  /  LIVE");
+        brand.setTextSize(19);
+        brand.setTypeface(Typeface.DEFAULT_BOLD);
+        header.addView(brand, new LinearLayout.LayoutParams(0, -2, 1));
+        Button full = tile("⛶ FULLSCREEN", Color.rgb(28, 85, 157), () -> {
+            if (!liveDashboardSelectedId.isEmpty())
+                showFullscreenLive(liveDashboardSelectedId, liveDashboardSelectedName, false);
+        });
+        full.setTextSize(12);
+        header.addView(full, new LinearLayout.LayoutParams(dp(132), dp(44)));
+
+        LinearLayout body = new LinearLayout(this);
+        body.setOrientation(LinearLayout.HORIZONTAL);
+        page.addView(body, new LinearLayout.LayoutParams(-1, 0, 1));
+        int screenWidth = getResources().getDisplayMetrics().widthPixels;
+        int sidebarWidth = Math.min(dp(235), Math.max(dp(145), screenWidth / 4));
+        ScrollView categoryScroll = new ScrollView(this);
+        categoryScroll.setBackgroundColor(Color.rgb(14, 28, 57));
+        body.addView(categoryScroll, new LinearLayout.LayoutParams(sidebarWidth, -1));
+        liveDashboardCategories = new LinearLayout(this);
+        liveDashboardCategories.setOrientation(LinearLayout.VERTICAL);
+        liveDashboardCategories.setPadding(dp(5), dp(7), dp(5), dp(7));
+        categoryScroll.addView(liveDashboardCategories);
+        LinearLayout main = new LinearLayout(this);
+        main.setOrientation(LinearLayout.VERTICAL);
+        main.setPadding(dp(8), dp(4), dp(8), dp(4));
+        body.addView(main, new LinearLayout.LayoutParams(0, -1, 1));
+
+        LinearLayout previewRow = new LinearLayout(this);
+        previewRow.setOrientation(LinearLayout.HORIZONTAL);
+        main.addView(previewRow, new LinearLayout.LayoutParams(-1, dp(190)));
+        liveDashboardPreview = new PlayerView(this);
+        liveDashboardPreview.setUseController(true);
+        liveDashboardPreview.setBackgroundColor(Color.BLACK);
+        previewRow.addView(liveDashboardPreview, new LinearLayout.LayoutParams(0, -1, 3));
+        LinearLayout epg = new LinearLayout(this);
+        epg.setOrientation(LinearLayout.VERTICAL);
+        epg.setPadding(dp(12), dp(8), dp(5), dp(8));
+        epg.setBackgroundColor(Color.rgb(14, 29, 57));
+        previewRow.addView(epg, new LinearLayout.LayoutParams(0, -1, 2));
+        liveDashboardTitle = text("Select a channel");
+        liveDashboardTitle.setTextSize(17);
+        liveDashboardTitle.setTypeface(Typeface.DEFAULT_BOLD);
+        liveDashboardTitle.setMaxLines(2);
+        epg.addView(liveDashboardTitle);
+        liveDashboardNow = text("NOW  •  Select a channel to preview");
+        liveDashboardNow.setTextSize(13);
+        liveDashboardNow.setPadding(0, dp(12), 0, dp(6));
+        epg.addView(liveDashboardNow);
+        liveDashboardNext = text("NEXT  •  Programme guide");
+        liveDashboardNext.setTextSize(13);
+        epg.addView(liveDashboardNext);
+        TextView heading = text("CHANNELS");
+        heading.setTextSize(16);
+        heading.setTypeface(Typeface.DEFAULT_BOLD);
+        heading.setPadding(dp(6), dp(9), 0, dp(5));
+        main.addView(heading);
+        ScrollView channelScroll = new ScrollView(this);
+        main.addView(channelScroll, new LinearLayout.LayoutParams(-1, 0, 1));
+        liveDashboardChannels = new GridLayout(this);
+        liveDashboardChannels.setColumnCount(3);
+        liveDashboardChannels.setPadding(dp(2), dp(2), dp(2), dp(8));
+        channelScroll.addView(liveDashboardChannels);
+        populateLiveDashboardCategories(categoryCache.get("live"));
+        selectLiveDashboardCategory("", "ALL CHANNELS");
+        if (categoryCache.get("live") == null) new Thread(() -> {
+            try {
+                JSONArray cats = new JSONArray(fetch(api(username, password, "get_live_categories")));
+                categoryCache.put("live", cats);
+                runOnUiThread(() -> {
+                    if (liveDashboardCategories != null && liveDashboardCategories.getParent() != null
+                        && "live".equals(currentType)) populateLiveDashboardCategories(cats);
+                });
+            } catch (Exception ignored) { }
+        }).start();
+    }
+
+    private void populateLiveDashboardCategories(JSONArray categories) {
+        liveDashboardCategories.removeAllViews();
+        addLiveDashboardCategory("ALL CHANNELS", "", "ALL CHANNELS");
+        if (categories == null) return;
+        for (int i = 0; i < categories.length(); i++) {
+            JSONObject cat = categories.optJSONObject(i);
+            if (cat == null) continue;
+            String id = cat.optString("category_id");
+            String name = cat.optString("category_name", "Other");
+            addLiveDashboardCategory(name, id, name);
+        }
+    }
+
+    private void addLiveDashboardCategory(String label, String id, String name) {
+        Button button = tile(label, Color.rgb(25, 42, 75),
+            () -> selectLiveDashboardCategory(id, name));
+        button.setTextSize(13);
+        button.setSingleLine(true);
+        button.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, dp(52));
+        params.setMargins(dp(2), dp(3), dp(2), dp(3));
+        liveDashboardCategories.addView(button, params);
+    }
+
+    private void selectLiveDashboardCategory(String categoryId, String label) {
+        int request = ++liveDashboardRequest;
+        liveDashboardChannels.removeAllViews();
+        liveDashboardChannels.addView(text("Loading " + label + "..."));
+        new Thread(() -> {
+            try {
+                String url = api(username, password, "get_live_streams");
+                if (!categoryId.isEmpty()) url += "&category_id=" + enc(categoryId);
+                JSONArray channels = new JSONArray(fetch(url));
+                runOnUiThread(() -> {
+                    if (request != liveDashboardRequest || liveDashboardChannels.getParent() == null) return;
+                    liveDashboardChannels.removeAllViews();
+                    int count = Math.min(channels.length(), 120);
+                    for (int i = 0; i < count; i++) {
+                        JSONObject item = channels.optJSONObject(i);
+                        if (item == null) continue;
+                        String id = item.optString("stream_id");
+                        String name = item.optString("name", "Channel");
+                        if (id.isEmpty()) continue;
+                        LinearLayout card = new LinearLayout(this);
+                        card.setOrientation(LinearLayout.VERTICAL);
+                        card.setGravity(Gravity.CENTER);
+                        card.setPadding(dp(5), dp(5), dp(5), dp(5));
+                        card.setBackgroundColor(Color.rgb(25, 38, 65));
+                        card.setFocusable(true);
+                        card.setClickable(true);
+                        card.setOnClickListener(v -> previewLiveDashboardChannel(id, name));
+                        card.setOnFocusChangeListener((v, focused) ->
+                            card.setBackgroundColor(focused ? Color.rgb(48, 91, 192) : Color.rgb(25, 38, 65)));
+                        ImageView logo = new ImageView(this);
+                        logo.setImageResource(android.R.drawable.ic_media_play);
+                        logo.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                        card.addView(logo, new LinearLayout.LayoutParams(-1, dp(44)));
+                        loadArtwork(item.optString("stream_icon"), logo);
+                        TextView title = text(name);
+                        title.setTextSize(12);
+                        title.setGravity(Gravity.CENTER);
+                        title.setMaxLines(2);
+                        title.setEllipsize(android.text.TextUtils.TruncateAt.END);
+                        card.addView(title);
+                        TextView programme = text("Loading guide...");
+                        programme.setTextSize(11);
+                        programme.setTextColor(Color.rgb(166, 200, 242));
+                        programme.setMaxLines(2);
+                        programme.setGravity(Gravity.CENTER);
+                        card.addView(programme);
+                        loadLiveCardEpg(id, programme);
+                        GridLayout.LayoutParams params = new GridLayout.LayoutParams();
+                        int mainWidth = getResources().getDisplayMetrics().widthPixels -
+                            Math.min(dp(235), Math.max(dp(145), getResources().getDisplayMetrics().widthPixels / 4)) - dp(30);
+                        params.width = Math.max(dp(110), mainWidth / 3 - dp(9));
+                        params.height = dp(116);
+                        params.setMargins(dp(3), dp(3), dp(3), dp(3));
+                        liveDashboardChannels.addView(card, params);
+                    }
+                });
+            } catch (Exception e) {
+                runOnUiThread(() -> {
+                    if (request == liveDashboardRequest && liveDashboardChannels.getParent() != null) {
+                        liveDashboardChannels.removeAllViews();
+                        liveDashboardChannels.addView(text("Channels unavailable. Select category to retry."));
+                    }
+                });
+            }
+        }).start();
+    }
+
+    private void previewLiveDashboardChannel(String id, String name) {
+        releasePlayer();
+        liveDashboardSelectedId = id;
+        liveDashboardSelectedName = name;
+        liveDashboardTitle.setText(name);
+        liveDashboardNow.setText("NOW  •  Loading...");
+        liveDashboardNext.setText("NEXT  •  Loading...");
+        startStream("live", id, "ts", liveDashboardPreview);
+        TextView status = liveDashboardNow;
+        attachPlaybackStatus(status, id);
+        LinearLayout schedule = new LinearLayout(this);
+        int request = ++epgRequest;
+        loadChannelEpg(id, request, liveDashboardNow, liveDashboardNext, schedule, true);
+    }
 
     private void showCategories(String type) {
         currentType = type;
