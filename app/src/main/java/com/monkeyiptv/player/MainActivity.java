@@ -781,6 +781,32 @@ public class MainActivity extends Activity {
         scroll.addView(contentGrid);
     }
 
+    private String selectedBrowseCategoryId = "";
+    private final java.util.Map<String, Button> browseCategoryButtons = new java.util.LinkedHashMap<>();
+    private final java.util.Map<String, Button> liveCategoryButtons = new java.util.LinkedHashMap<>();
+
+    private void highlightBrowseCategory(String id) {
+        selectedBrowseCategoryId = id;
+        for (java.util.Map.Entry<String, Button> entry : browseCategoryButtons.entrySet()) {
+            boolean active = entry.getKey().equals(id);
+            Button button = entry.getValue();
+            button.setBackgroundTintList(android.content.res.ColorStateList.valueOf(
+                active ? Color.rgb(24, 113, 197) : Color.rgb(29, 39, 65)));
+            button.setTextColor(Color.WHITE);
+            button.setTypeface(null, active ? Typeface.BOLD : Typeface.NORMAL);
+            button.setAlpha(active ? 1f : 0.88f);
+        }
+    }
+
+    private void browseSidebarItem(String id, String title, Runnable action) {
+        sidebarItem(title, id.equals(selectedBrowseCategoryId), () -> {
+            highlightBrowseCategory(id);
+            action.run();
+        });
+        Button button = (Button) categorySidebar.getChildAt(categorySidebar.getChildCount() - 1);
+        browseCategoryButtons.put(id, button);
+    }
+
     private void sidebarItem(String title, boolean selected, Runnable action) {
         Button item = tile(title, selected ? Color.rgb(23, 110, 185) : Color.rgb(29, 39, 65), action);
         item.setTextSize(15);
@@ -924,6 +950,7 @@ public class MainActivity extends Activity {
 
     private void populateLiveDashboardCategories(JSONArray categories) {
         liveDashboardCategories.removeAllViews();
+        liveCategoryButtons.clear();
         addLiveDashboardCategory("ALL CHANNELS", "", "ALL CHANNELS");
         if (categories == null) return;
         for (int i = 0; i < categories.length(); i++) {
@@ -944,10 +971,19 @@ public class MainActivity extends Activity {
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, dp(43));
         params.setMargins(dp(2), dp(2), dp(2), dp(2));
         liveDashboardCategories.addView(button, params);
+        liveCategoryButtons.put(id, button);
     }
 
     private void selectLiveDashboardCategory(String categoryId, String label) {
         liveDashboardCategoryId = categoryId;
+        for (java.util.Map.Entry<String, Button> entry : liveCategoryButtons.entrySet()) {
+            boolean active = entry.getKey().equals(categoryId);
+            Button item = entry.getValue();
+            item.setBackgroundTintList(android.content.res.ColorStateList.valueOf(
+                active ? Color.rgb(24, 113, 197) : Color.rgb(25, 42, 75)));
+            item.setTypeface(null, active ? Typeface.BOLD : Typeface.NORMAL);
+            item.setAlpha(active ? 1f : 0.86f);
+        }
         int request = ++liveDashboardRequest;
         liveDashboardChannels.removeAllViews();
         liveDashboardCards.clear();
@@ -1132,7 +1168,9 @@ public class MainActivity extends Activity {
         contentGrid.setColumnCount(width >= dp(950) ? 5 : width >= dp(620) ? 4 : 3);
         contentGrid.setPadding(dp(2), dp(2), dp(2), dp(8));
         posterScroll.addView(contentGrid);
-        sidebarItem("ALL MOVIES", true, () -> { browserHeading.setText("ALL MOVIES"); showItems("vod", ""); });
+        browseCategoryButtons.clear();
+        selectedBrowseCategoryId = "";
+        browseSidebarItem("", "ALL MOVIES", () -> { browserHeading.setText("ALL MOVIES"); showItems("vod", ""); });
         JSONArray cached = categoryCache.get("vod");
         if (cached != null) renderMovieSidebar(cached);
         else new Thread(() -> {
@@ -1151,13 +1189,15 @@ public class MainActivity extends Activity {
 
     private void renderMovieSidebar(JSONArray categories) {
         categorySidebar.removeAllViews();
-        sidebarItem("ALL MOVIES", true, () -> { browserHeading.setText("ALL MOVIES"); showItems("vod", ""); });
+        browseCategoryButtons.clear();
+        selectedBrowseCategoryId = "";
+        browseSidebarItem("", "ALL MOVIES", () -> { browserHeading.setText("ALL MOVIES"); showItems("vod", ""); });
         for (int i = 0; i < categories.length(); i++) {
             JSONObject c = categories.optJSONObject(i);
             if (c == null) continue;
             String id = c.optString("category_id");
             String name = c.optString("category_name", "Movies");
-            sidebarItem(name, false, () -> {
+            browseSidebarItem(id, name, () -> {
                 browserHeading.setText(name.toUpperCase(java.util.Locale.ROOT));
                 showItems("vod", id);
             });
@@ -1235,7 +1275,9 @@ public class MainActivity extends Activity {
         contentGrid.setColumnCount(width >= dp(900) ? 4 : 3);
         contentGrid.setPadding(dp(2), dp(2), dp(2), dp(8));
         posterScroll.addView(contentGrid);
-        sidebarItem("ALL SERIES", true, () -> { browserHeading.setText("ALL SERIES"); showItems("series", ""); });
+        browseCategoryButtons.clear();
+        selectedBrowseCategoryId = "";
+        browseSidebarItem("", "ALL SERIES", () -> { browserHeading.setText("ALL SERIES"); showItems("series", ""); });
         JSONArray cached = categoryCache.get("series");
         if (cached != null) renderSeriesSidebar(cached);
         else new Thread(() -> {
@@ -1254,7 +1296,9 @@ public class MainActivity extends Activity {
 
     private void renderSeriesSidebar(JSONArray categories) {
         categorySidebar.removeAllViews();
-        sidebarItem("ALL SERIES", true, () -> { browserHeading.setText("ALL SERIES"); showItems("series", ""); });
+        browseCategoryButtons.clear();
+        selectedBrowseCategoryId = "";
+        browseSidebarItem("", "ALL SERIES", () -> { browserHeading.setText("ALL SERIES"); showItems("series", ""); });
         for (int i = 0; i < categories.length(); i++) {
             JSONObject c = categories.optJSONObject(i);
             if (c == null) continue;
