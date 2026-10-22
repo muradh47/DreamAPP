@@ -2385,7 +2385,59 @@ public class MainActivity extends Activity {
             final String downloadPath = "dream-iptv-update-" + System.currentTimeMillis() + ".apk";
             request.setDestinationInExternalFilesDir(this, android.os.Environment.DIRECTORY_DOWNLOADS, downloadPath);
             updateDownloadId = manager.enqueue(request);
-            status.setText("Downloading update...");
+            status.setText("Downloading update... 0%");
+            ProgressBar downloadBar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
+            downloadBar.setMax(100);
+            downloadBar.setProgress(0);
+            LinearLayout progressLayout = new LinearLayout(this);
+            progressLayout.setOrientation(LinearLayout.VERTICAL);
+            progressLayout.setPadding(dp(24), dp(16), dp(24), dp(12));
+            TextView progressLabel = text("Downloading Dream IPTV update • 0%");
+            progressLabel.setTextSize(16);
+            progressLayout.addView(progressLabel);
+            progressLayout.addView(downloadBar, new LinearLayout.LayoutParams(-1, dp(18)));
+            android.app.AlertDialog progressDialog = new android.app.AlertDialog.Builder(this)
+                .setTitle("Updating Dream IPTV")
+                .setView(progressLayout)
+                .setNegativeButton("HIDE", (dialog, which) -> {})
+                .create();
+            progressDialog.show();
+            android.os.Handler downloadHandler = new android.os.Handler(android.os.Looper.getMainLooper());
+            Runnable pollProgress = new Runnable() {
+                @Override public void run() {
+                    if (updateDownloadId < 0) return;
+                    DownloadManager.Query progressQuery = new DownloadManager.Query().setFilterById(updateDownloadId);
+                    try (Cursor progressCursor = manager.query(progressQuery)) {
+                        if (progressCursor == null || !progressCursor.moveToFirst()) return;
+                        int state = progressCursor.getInt(progressCursor.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS));
+                        long total = progressCursor.getLong(progressCursor.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES));
+                        long done = progressCursor.getLong(progressCursor.getColumnIndexOrThrow(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR));
+                        if (total > 0) {
+                            int percent = (int) Math.min(100, done * 100 / total);
+                            downloadBar.setProgress(percent);
+                            String progressText = "Downloading Dream IPTV update • " + percent + "%";
+                            progressLabel.setText(progressText);
+                            status.setText(progressText);
+                        } else {
+                            progressLabel.setText("Downloading Dream IPTV update • " + (done / 1048576) + " MB");
+                            status.setText("Downloading update • " + (done / 1048576) + " MB");
+                        }
+                        if (state == DownloadManager.STATUS_SUCCESSFUL) {
+                            downloadBar.setProgress(100);
+                            progressLabel.setText("Download complete • 100%");
+                            progressDialog.dismiss();
+                            return;
+                        }
+                        if (state == DownloadManager.STATUS_FAILED) {
+                            progressLabel.setText("Download failed");
+                            progressDialog.dismiss();
+                            return;
+                        }
+                    } catch (Exception ignored) { return; }
+                    downloadHandler.postDelayed(this, 700);
+                }
+            };
+            downloadHandler.post(pollProgress);
             if (updateReceiver != null) unregisterReceiver(updateReceiver);
             updateReceiver = new BroadcastReceiver() {
                 @Override public void onReceive(Context context, Intent intent) {
