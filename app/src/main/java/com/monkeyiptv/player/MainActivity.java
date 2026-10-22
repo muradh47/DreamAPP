@@ -1391,11 +1391,21 @@ public class MainActivity extends Activity {
         getWindow().getDecorView().setSystemUiVisibility(0);
         LinearLayout page = new LinearLayout(this);
         page.setOrientation(LinearLayout.VERTICAL);
-        page.setPadding(dp(20), dp(12), dp(20), dp(12));
+        page.setPadding(dp(20), dp(18), dp(20), dp(12));
         page.setBackgroundColor(Color.rgb(9, 17, 37));
-        setContentView(page);
+        android.widget.FrameLayout scene = new android.widget.FrameLayout(this);
+        scene.setBackgroundColor(Color.rgb(9, 17, 37));
+        scene.setFitsSystemWindows(true);
+        ImageView backdrop = new ImageView(this);
+        backdrop.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        backdrop.setAlpha(0.23f);
+        scene.addView(backdrop, new android.widget.FrameLayout.LayoutParams(-1, -1));
+        page.setBackgroundColor(Color.TRANSPARENT);
+        scene.addView(page, new android.widget.FrameLayout.LayoutParams(-1, -1));
+        setContentView(scene);
         Button back = tile("‹ BACK TO MOVIES", Color.rgb(25, 42, 75), this::showMovieDashboard);
-        page.addView(back, new LinearLayout.LayoutParams(dp(180), dp(46)));
+        back.setTextSize(12);
+        page.addView(back, new LinearLayout.LayoutParams(dp(200), dp(48)));
         ScrollView scroll = new ScrollView(this);
         page.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
         LinearLayout row = new LinearLayout(this);
@@ -1446,7 +1456,16 @@ public class MainActivity extends Activity {
         description.setTextSize(17);
         description.setPadding(0, dp(22), 0, 0);
         info.addView(description);
-        populateMovieDetails(listing == null ? new JSONObject() : listing, facts, description, trailerUrl);
+        TextView credits = text("");
+        credits.setTextSize(14);
+        credits.setTextColor(Color.rgb(181, 199, 223));
+        credits.setPadding(0, dp(16), 0, 0);
+        info.addView(credits);
+        JSONObject original = listing == null ? new JSONObject() : listing;
+        populateMovieDetails(original, facts, description, trailerUrl);
+        populateMovieCredits(original, credits);
+        String initialBackdrop = movieBackdrop(original);
+        if (!initialBackdrop.isEmpty()) loadArtwork(initialBackdrop, backdrop);
         new Thread(() -> {
             try {
                 JSONObject response = new JSONObject(fetch(api(username, password, "get_vod_info") + "&vod_id=" + enc(id)));
@@ -1456,6 +1475,10 @@ public class MainActivity extends Activity {
                 runOnUiThread(() -> {
                     if (scroll.getParent() != page) return;
                     populateMovieDetails(ready, facts, description, trailerUrl);
+                    populateMovieCredits(ready, credits);
+                    String backdropUrl = movieBackdrop(ready);
+                    if (backdropUrl.isEmpty()) backdropUrl = movieBackdrop(response);
+                    if (!backdropUrl.isEmpty()) loadArtwork(backdropUrl, backdrop);
                     String updatedPoster = ready.optString("movie_image", ready.optString("cover_big", ""));
                     if (!updatedPoster.isEmpty()) loadArtwork(updatedPoster, cover);
                 });
@@ -1469,6 +1492,37 @@ public class MainActivity extends Activity {
         playButton.requestFocus();
     }
 
+    private String movieBackdrop(JSONObject data) {
+        JSONArray backdrops = data.optJSONArray("backdrop_path");
+        if (backdrops == null) backdrops = data.optJSONArray("backdrop");
+        if (backdrops != null && backdrops.length() > 0) {
+            String url = backdrops.optString(0, "");
+            if (url.startsWith("http")) return url;
+        }
+        for (String key : new String[]{"backdrop_path", "backdrop", "backdrop_url", "background", "cover_big"}) {
+            String url = data.optString(key, "");
+            if (url.startsWith("http://") || url.startsWith("https://")) return url;
+        }
+        return "";
+    }
+
+    private void populateMovieCredits(JSONObject data, TextView credits) {
+        String director = data.optString("director", "");
+        String cast = data.optString("cast", data.optString("actors", ""));
+        String country = data.optString("country", "");
+        StringBuilder result = new StringBuilder();
+        if (!director.isEmpty()) result.append("Director: ").append(director);
+        if (!cast.isEmpty()) {
+            if (result.length() > 0) result.append("\\n\\n");
+            result.append("Cast: ").append(cast);
+        }
+        if (!country.isEmpty()) {
+            if (result.length() > 0) result.append("\\n\\n");
+            result.append("Country: ").append(country);
+        }
+        credits.setText(result.toString());
+    }
+
     private void populateMovieDetails(JSONObject movie, TextView facts, TextView description, String[] trailerUrl) {
         String year = movie.optString("releasedate", movie.optString("releaseDate", movie.optString("year", "")));
         String genre = movie.optString("genre", "");
@@ -1477,7 +1531,7 @@ public class MainActivity extends Activity {
         String meta = (year.length() >= 4 ? year.substring(0, 4) : "") +
             (!genre.isEmpty() ? "    •    " + genre : "") +
             (!duration.isEmpty() ? "    •    " + duration : "") +
-            (!rating.isEmpty() ? "    •    ★ " + rating : "");
+            (!rating.isEmpty() ? "    •    ★ " + rating + " (provider)" : "");
         facts.setText(meta.trim().isEmpty() ? "Movie" : meta.trim());
         String plot = movie.optString("plot", movie.optString("description", movie.optString("overview", "")));
         description.setText(plot.isEmpty() ? "No description available from your provider." : plot);
