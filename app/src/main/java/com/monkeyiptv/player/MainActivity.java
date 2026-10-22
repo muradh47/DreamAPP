@@ -1212,7 +1212,7 @@ public class MainActivity extends Activity {
         body.setOrientation(LinearLayout.HORIZONTAL);
         page.addView(body, new LinearLayout.LayoutParams(-1, 0, 1));
         int width = getResources().getDisplayMetrics().widthPixels;
-        int sideWidth = Math.min(dp(255), Math.max(dp(150), width / 4));
+        int sideWidth = Math.min(dp(190), Math.max(dp(128), width / 6));
         ScrollView sidebarScroll = new ScrollView(this);
         sidebarScroll.setBackgroundColor(Color.rgb(15, 29, 58));
         body.addView(sidebarScroll, new LinearLayout.LayoutParams(sideWidth, -1));
@@ -1224,7 +1224,7 @@ public class MainActivity extends Activity {
         main.setOrientation(LinearLayout.VERTICAL);
         main.setPadding(dp(6), dp(4), dp(6), 0);
         body.addView(main, new LinearLayout.LayoutParams(0, -1, 1));
-        browserHeading = text("ALL SERIES");
+        browserHeading = text("DISCOVER SERIES");
         browserHeading.setTypeface(Typeface.DEFAULT_BOLD);
         browserHeading.setTextSize(19);
         browserHeading.setPadding(dp(6), dp(8), 0, dp(8));
@@ -1232,7 +1232,7 @@ public class MainActivity extends Activity {
         ScrollView posterScroll = new ScrollView(this);
         main.addView(posterScroll, new LinearLayout.LayoutParams(-1, 0, 1));
         contentGrid = new GridLayout(this);
-        contentGrid.setColumnCount(width >= dp(950) ? 5 : width >= dp(620) ? 4 : 3);
+        contentGrid.setColumnCount(width >= dp(900) ? 4 : 3);
         contentGrid.setPadding(dp(2), dp(2), dp(2), dp(8));
         posterScroll.addView(contentGrid);
         sidebarItem("ALL SERIES", true, () -> { browserHeading.setText("ALL SERIES"); showItems("series", ""); });
@@ -1486,7 +1486,7 @@ public class MainActivity extends Activity {
         });
     }
 
-    private int moviePosterHeight(String type) { return type.equals("vod") && categorySidebar != null && categorySidebar.getParent() != null ? dp(146) : dp(105); }
+    private int moviePosterHeight(String type) { return type.equals("series") && categorySidebar != null && categorySidebar.getParent() != null ? dp(265) : type.equals("vod") && categorySidebar != null && categorySidebar.getParent() != null ? dp(146) : dp(105); }
 
     private void showMovieDetails(String id, String name, String ext, String poster, JSONObject listing) {
         releasePlayer();
@@ -1706,13 +1706,15 @@ public class MainActivity extends Activity {
             focused ? Color.rgb(33, 107, 187) : Color.rgb(29, 36, 52)));
         ImageView image = new ImageView(this);
         image.setImageResource(android.R.drawable.ic_menu_gallery);
-        image.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        image.setPadding(dp(8), dp(8), dp(8), dp(8));
+        image.setScaleType(type.equals("series") ? ImageView.ScaleType.CENTER_CROP : ImageView.ScaleType.FIT_CENTER);
+        image.setPadding(type.equals("series") ? 0 : dp(8), type.equals("series") ? 0 : dp(8),
+            type.equals("series") ? 0 : dp(8), type.equals("series") ? 0 : dp(8));
         card.addView(image, new LinearLayout.LayoutParams(-1, moviePosterHeight(type)));
         loadArtwork(logo, image);
         TextView label = text(name);
-        label.setTextSize(14);
+        label.setTextSize(type.equals("series") ? 16 : 14);
         label.setMaxLines(2);
+        label.setEllipsize(android.text.TextUtils.TruncateAt.END);
         label.setGravity(Gravity.CENTER);
         card.addView(label, new LinearLayout.LayoutParams(-1, dp(45)));
         if (!type.equals("live")) {
@@ -1732,13 +1734,15 @@ public class MainActivity extends Activity {
             }
         }
         GridLayout.LayoutParams gp = new GridLayout.LayoutParams();
+        boolean seriesWall = type.equals("series") && categorySidebar != null && categorySidebar.getParent() != null;
         boolean movieWall = type.equals("vod") && categorySidebar != null && categorySidebar.getParent() != null;
         int availableWidth = getResources().getDisplayMetrics().widthPixels
-            - (movieWall ? Math.min(dp(255), Math.max(dp(150), getResources().getDisplayMetrics().widthPixels / 4)) : dp(16))
+            - (seriesWall ? Math.min(dp(190), Math.max(dp(128), getResources().getDisplayMetrics().widthPixels / 6)) : movieWall ? Math.min(dp(255), Math.max(dp(150), getResources().getDisplayMetrics().widthPixels / 4)) : dp(16))
             - dp(26);
         int cols = contentGrid.getColumnCount();
-        gp.width = movieWall ? Math.max(dp(95), availableWidth / cols - dp(12)) : dp(155);
-        gp.height = movieWall ? dp(214) : dp(170);
+        gp.width = seriesWall ? Math.max(dp(140), availableWidth / cols - dp(12)) :
+            movieWall ? Math.max(dp(95), availableWidth / cols - dp(12)) : dp(155);
+        gp.height = seriesWall ? dp(330) : movieWall ? dp(214) : dp(170);
         gp.setMargins(dp(6), dp(6), dp(6), dp(6));
         contentGrid.addView(card, gp);
 
