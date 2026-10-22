@@ -754,6 +754,7 @@ public class MainActivity extends Activity {
         LinearLayout page = new LinearLayout(this);
         page.setOrientation(LinearLayout.VERTICAL);
         page.setBackgroundColor(Color.rgb(11, 16, 35));
+        page.setFitsSystemWindows(true);
         setContentView(page);
         getWindow().getDecorView().setSystemUiVisibility(0);
         LinearLayout header = new LinearLayout(this);
@@ -766,24 +767,12 @@ public class MainActivity extends Activity {
         browserHeading = text(type.equals("live") ? "LIVE TV" : type.equals("vod") ? "MOVIES" : "SERIES");
         browserHeading.setTextSize(20);
         header.addView(browserHeading, new LinearLayout.LayoutParams(0, -2, 1));
-        LinearLayout body = new LinearLayout(this);
-        body.setOrientation(LinearLayout.HORIZONTAL);
-        page.addView(body, new LinearLayout.LayoutParams(-1, 0, 1));
         categorySidebar = new LinearLayout(this);
         categorySidebar.setOrientation(LinearLayout.VERTICAL);
-        if (type.equals("live")) {
-            ScrollView categoryScroll = new ScrollView(this);
-            categoryScroll.setFillViewport(false);
-            categoryScroll.setBackgroundColor(Color.rgb(15, 33, 66));
-            categoryScroll.addView(categorySidebar);
-            int sidebarWidth = Math.min(dp(230),
-                Math.max(dp(125), getResources().getDisplayMetrics().widthPixels / 3));
-            body.addView(categoryScroll, new LinearLayout.LayoutParams(sidebarWidth, -1));
-        }
         ScrollView scroll = new ScrollView(this);
-        body.addView(scroll, new LinearLayout.LayoutParams(0, -1, 1));
+        page.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
         contentGrid = new GridLayout(this);
-        contentGrid.setColumnCount(type.equals("live") ? 1 : 4);
+        contentGrid.setColumnCount(type.equals("live") ? 2 : 4);
         contentGrid.setPadding(dp(8), dp(10), dp(8), dp(10));
         scroll.addView(contentGrid);
     }
@@ -1003,8 +992,8 @@ public class MainActivity extends Activity {
             titleView.setPadding(dp(12), 0, 0, 0);
             row.addView(titleView, new LinearLayout.LayoutParams(0, -1, 1f));
             GridLayout.LayoutParams rowParams = new GridLayout.LayoutParams();
-            int available = getResources().getDisplayMetrics().widthPixels - dp(52);
-            rowParams.width = Math.max(dp(200), available / 2 - dp(12));
+            int available = getResources().getDisplayMetrics().widthPixels - dp(36);
+            rowParams.width = Math.max(dp(140), available / 2 - dp(10));
             rowParams.height = dp(68);
             rowParams.setMargins(dp(5), dp(5), dp(5), dp(5));
             contentGrid.addView(row, rowParams);
