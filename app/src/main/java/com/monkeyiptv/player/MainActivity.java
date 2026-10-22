@@ -349,7 +349,7 @@ public class MainActivity extends Activity {
         addHomeTile(primary, homeTile("🎬\nMOVIES",
             Color.rgb(219, 32, 45), this::showMovieDashboard), compact ? 126 : 196);
         addHomeTile(primary, homeTile("🎭\nSERIES",
-            Color.rgb(98, 14, 180), () -> showCategories("series")), compact ? 126 : 196);
+            Color.rgb(98, 14, 180), this::showSeriesDashboard), compact ? 126 : 196);
 
         LinearLayout shortcuts = row();
         if (compact) shortcuts.setOrientation(LinearLayout.VERTICAL);
@@ -1164,6 +1164,109 @@ public class MainActivity extends Activity {
         }
     }
 
+    private void showSeriesDashboard() {
+        releasePlayer();
+        currentType = "series";
+        ++browseRequest;
+        setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
+        getWindow().getDecorView().setSystemUiVisibility(0);
+        LinearLayout page = new LinearLayout(this);
+        page.setOrientation(LinearLayout.VERTICAL);
+        page.setFitsSystemWindows(true);
+        page.setBackgroundColor(Color.rgb(9, 17, 37));
+        setContentView(page);
+        LinearLayout header = new LinearLayout(this);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        header.setPadding(dp(10), dp(5), dp(10), dp(5));
+        page.addView(header, new LinearLayout.LayoutParams(-1, dp(58)));
+        Button home = tile("‹ HOME", Color.rgb(25, 42, 75), this::showHome);
+        home.setTextSize(14);
+        header.addView(home, new LinearLayout.LayoutParams(dp(90), dp(44)));
+        TextView title = text("  DREAM IPTV  /  SERIES");
+        title.setTypeface(Typeface.DEFAULT_BOLD);
+        title.setTextSize(19);
+        header.addView(title, new LinearLayout.LayoutParams(0, -2, 1));
+        Button search = tile("⌕", Color.rgb(25, 42, 75), () -> {
+            EditText input = new EditText(this);
+            input.setSingleLine(true);
+            input.setHint("Search series titles");
+            new android.app.AlertDialog.Builder(this).setTitle("Search series").setView(input)
+                .setPositiveButton("SEARCH", (dialog, which) -> {
+                    String q = input.getText().toString().trim().toLowerCase(java.util.Locale.ROOT);
+                    if (currentItems == null) return;
+                    JSONArray matches = new JSONArray();
+                    for (int i = 0; i < currentItems.length(); i++) {
+                        JSONObject series = currentItems.optJSONObject(i);
+                        if (series != null && series.optString("name", "").toLowerCase(java.util.Locale.ROOT).contains(q))
+                            matches.put(series);
+                    }
+                    currentItems = matches;
+                    nextItemIndex = 0;
+                    contentGrid.removeAllViews();
+                    browserHeading.setText("SEARCH RESULTS");
+                    appendNextPage();
+                }).setNegativeButton("CANCEL", null).show();
+        });
+        header.addView(search, new LinearLayout.LayoutParams(dp(52), dp(44)));
+        LinearLayout body = new LinearLayout(this);
+        body.setOrientation(LinearLayout.HORIZONTAL);
+        page.addView(body, new LinearLayout.LayoutParams(-1, 0, 1));
+        int width = getResources().getDisplayMetrics().widthPixels;
+        int sideWidth = Math.min(dp(255), Math.max(dp(150), width / 4));
+        ScrollView sidebarScroll = new ScrollView(this);
+        sidebarScroll.setBackgroundColor(Color.rgb(15, 29, 58));
+        body.addView(sidebarScroll, new LinearLayout.LayoutParams(sideWidth, -1));
+        categorySidebar = new LinearLayout(this);
+        categorySidebar.setOrientation(LinearLayout.VERTICAL);
+        categorySidebar.setPadding(dp(5), dp(6), dp(5), dp(6));
+        sidebarScroll.addView(categorySidebar);
+        LinearLayout main = new LinearLayout(this);
+        main.setOrientation(LinearLayout.VERTICAL);
+        main.setPadding(dp(6), dp(4), dp(6), 0);
+        body.addView(main, new LinearLayout.LayoutParams(0, -1, 1));
+        browserHeading = text("ALL SERIES");
+        browserHeading.setTypeface(Typeface.DEFAULT_BOLD);
+        browserHeading.setTextSize(19);
+        browserHeading.setPadding(dp(6), dp(8), 0, dp(8));
+        main.addView(browserHeading);
+        ScrollView posterScroll = new ScrollView(this);
+        main.addView(posterScroll, new LinearLayout.LayoutParams(-1, 0, 1));
+        contentGrid = new GridLayout(this);
+        contentGrid.setColumnCount(width >= dp(950) ? 5 : width >= dp(620) ? 4 : 3);
+        contentGrid.setPadding(dp(2), dp(2), dp(2), dp(8));
+        posterScroll.addView(contentGrid);
+        sidebarItem("ALL SERIES", true, () -> { browserHeading.setText("ALL SERIES"); showItems("series", ""); });
+        JSONArray cached = categoryCache.get("series");
+        if (cached != null) renderSeriesSidebar(cached);
+        else new Thread(() -> {
+            try {
+                JSONArray categories = new JSONArray(fetch(api(username, password, "get_series_categories")));
+                categoryCache.put("series", categories);
+                runOnUiThread(() -> {
+                    if (categorySidebar.getParent() != null) renderSeriesSidebar(categories);
+                });
+            } catch (Exception ignored) {
+                runOnUiThread(() -> sidebarItem("RETRY CATEGORIES", false, this::showSeriesDashboard));
+            }
+        }).start();
+        showItems("series", "");
+    }
+
+    private void renderSeriesSidebar(JSONArray categories) {
+        categorySidebar.removeAllViews();
+        sidebarItem("ALL SERIES", true, () -> { browserHeading.setText("ALL SERIES"); showItems("series", ""); });
+        for (int i = 0; i < categories.length(); i++) {
+            JSONObject c = categories.optJSONObject(i);
+            if (c == null) continue;
+            String id = c.optString("category_id");
+            String name = c.optString("category_name", "Series");
+            sidebarItem(name, false, () -> {
+                browserHeading.setText(name.toUpperCase(java.util.Locale.ROOT));
+                showItems("series", id);
+            });
+        }
+    }
+
     private void showCategories(String type) {
         currentType = type;
         ++browseRequest;
@@ -1596,7 +1699,7 @@ public class MainActivity extends Activity {
         card.setFocusable(true);
         card.setOnClickListener(v -> {
             if (type.equals("live")) showChannel(id, name);
-            else if (type.equals("series")) showEpisodes(id, name);
+            else if (type.equals("series")) showSeriesDetails(id, name, logo, metadata);
             else showMovieDetails(id, name, ext, logo, metadata);
         });
         card.setOnFocusChangeListener((v, focused) -> card.setBackgroundColor(
@@ -1708,6 +1811,121 @@ public class MainActivity extends Activity {
         StringBuilder result = new StringBuilder(bytes.length * 2);
         for (byte b : bytes) result.append(String.format(java.util.Locale.ROOT, "%02x", b & 255));
         return result.toString();
+    }
+
+    private void showSeriesDetails(String seriesId, String name, String poster, JSONObject listing) {
+        releasePlayer();
+        setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
+        getWindow().getDecorView().setSystemUiVisibility(0);
+        LinearLayout page = new LinearLayout(this);
+        page.setOrientation(LinearLayout.VERTICAL);
+        page.setFitsSystemWindows(true);
+        page.setPadding(dp(16), dp(8), dp(16), dp(8));
+        page.setBackgroundColor(Color.rgb(9, 17, 37));
+        setContentView(page);
+        Button back = tile("‹ BACK TO SERIES", Color.rgb(25, 42, 75), this::showSeriesDashboard);
+        page.addView(back, new LinearLayout.LayoutParams(dp(190), dp(45)));
+        ScrollView scroll = new ScrollView(this);
+        page.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        scroll.addView(content);
+        LinearLayout hero = new LinearLayout(this);
+        hero.setPadding(0, dp(14), 0, dp(14));
+        content.addView(hero);
+        ImageView cover = new ImageView(this);
+        cover.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        hero.addView(cover, new LinearLayout.LayoutParams(dp(190), dp(280)));
+        loadArtwork(poster, cover);
+        LinearLayout info = new LinearLayout(this);
+        info.setOrientation(LinearLayout.VERTICAL);
+        info.setPadding(dp(20), 0, 0, 0);
+        hero.addView(info, new LinearLayout.LayoutParams(0, -2, 1));
+        TextView heading = text(name);
+        heading.setTextSize(26);
+        heading.setTypeface(Typeface.DEFAULT_BOLD);
+        info.addView(heading);
+        TextView facts = text("Loading series details...");
+        facts.setTextSize(15);
+        facts.setTextColor(Color.rgb(160, 195, 235));
+        info.addView(facts);
+        TextView plot = text(listing == null ? "" : listing.optString("plot", ""));
+        plot.setTextSize(16);
+        plot.setPadding(0, dp(14), 0, dp(10));
+        info.addView(plot);
+        TextView seasonLabel = text("SEASONS & EPISODES");
+        seasonLabel.setTextSize(21);
+        seasonLabel.setTypeface(Typeface.DEFAULT_BOLD);
+        content.addView(seasonLabel);
+        LinearLayout episodesList = new LinearLayout(this);
+        episodesList.setOrientation(LinearLayout.VERTICAL);
+        content.addView(episodesList);
+        episodesList.addView(text("Loading episodes..."));
+        new Thread(() -> {
+            try {
+                JSONObject response = new JSONObject(fetch(api(username, password, "get_series_info") + "&series_id=" + enc(seriesId)));
+                JSONObject metadata = response.optJSONObject("info");
+                JSONObject episodes = response.optJSONObject("episodes");
+                runOnUiThread(() -> {
+                    if (scroll.getParent() != page) return;
+                    if (metadata != null) {
+                        String year = metadata.optString("releaseDate", metadata.optString("year", ""));
+                        String genre = metadata.optString("genre", "");
+                        String rating = metadata.optString("rating", "");
+                        facts.setText(year + (!genre.isEmpty() ? "   •   " + genre : "") +
+                            (!rating.isEmpty() ? "   •   ★ " + rating + " (provider)" : ""));
+                        String description = metadata.optString("plot", metadata.optString("description", ""));
+                        if (!description.isEmpty()) plot.setText(description);
+                        String image = metadata.optString("cover", "");
+                        if (!image.isEmpty()) loadArtwork(image, cover);
+                    }
+                    episodesList.removeAllViews();
+                    if (episodes == null || episodes.length() == 0) {
+                        episodesList.addView(text("No episodes available from your provider."));
+                        return;
+                    }
+                    java.util.ArrayList<String> keys = new java.util.ArrayList<>();
+                    java.util.Iterator<String> iterator = episodes.keys();
+                    while (iterator.hasNext()) keys.add(iterator.next());
+                    keys.sort((x, y) -> {
+                        try { return Integer.compare(Integer.parseInt(x), Integer.parseInt(y)); }
+                        catch (NumberFormatException e) { return x.compareTo(y); }
+                    });
+                    for (String season : keys) {
+                        JSONArray entries = episodes.optJSONArray(season);
+                        if (entries == null) continue;
+                        Button seasonButton = tile("SEASON " + season + "  (" + entries.length() + " episodes)  ▾",
+                            Color.rgb(25, 42, 75), () -> {});
+                        episodesList.addView(seasonButton, new LinearLayout.LayoutParams(-1, dp(52)));
+                        LinearLayout seasonItems = new LinearLayout(this);
+                        seasonItems.setOrientation(LinearLayout.VERTICAL);
+                        episodesList.addView(seasonItems);
+                        seasonButton.setOnClickListener(v -> seasonItems.setVisibility(
+                            seasonItems.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE));
+                        for (int i = 0; i < entries.length(); i++) {
+                            JSONObject episode = entries.optJSONObject(i);
+                            if (episode == null) continue;
+                            String episodeId = episode.optString("id");
+                            String extension = episode.optString("container_extension", "mp4");
+                            String title = episode.optString("title", "Episode " + (i + 1));
+                            JSONObject episodeInfo = episode.optJSONObject("info");
+                            String duration = episodeInfo == null ? "" : episodeInfo.optString("duration", "");
+                            Button episodeButton = tile("▶  " + title + (duration.isEmpty() ? "" : "  •  " + duration),
+                                Color.rgb(26, 39, 65), () -> play("series", episodeId, extension));
+                            episodeButton.setTextSize(14);
+                            episodeButton.setGravity(Gravity.CENTER_VERTICAL | Gravity.LEFT);
+                            seasonItems.addView(episodeButton, new LinearLayout.LayoutParams(-1, dp(58)));
+                        }
+                    }
+                });
+            } catch (Exception e) {
+                runOnUiThread(() -> {
+                    if (scroll.getParent() != page) return;
+                    episodesList.removeAllViews();
+                    episodesList.addView(text("Unable to load series episodes. Please try again."));
+                });
+            }
+        }).start();
     }
 
     private void showEpisodes(String seriesId, String name) {
