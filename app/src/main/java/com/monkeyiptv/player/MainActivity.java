@@ -1609,7 +1609,7 @@ public class MainActivity extends Activity {
         LinearLayout controls = new LinearLayout(this);
         controls.setGravity(Gravity.CENTER_VERTICAL);
         controls.setBackgroundColor(Color.argb(200, 8, 20, 44));
-        android.widget.FrameLayout.LayoutParams cp = new android.widget.FrameLayout.LayoutParams(-1, dp(55), Gravity.BOTTOM);
+        android.widget.FrameLayout.LayoutParams cp = new android.widget.FrameLayout.LayoutParams(-1, dp(65), Gravity.BOTTOM);
         frame.addView(controls, cp);
         Button back = tile("‹ BACK", Color.rgb(25, 42, 75), () -> {
             releaseVlc();
@@ -1624,9 +1624,47 @@ public class MainActivity extends Activity {
         });
         toggle.setTextSize(14);
         controls.addView(toggle, new LinearLayout.LayoutParams(dp(100), dp(48)));
+        if (!type.equals("live")) {
+            Button rewind = tile("« 10s", Color.rgb(25, 42, 75), () -> {
+                if (vlcPlayer != null && vlcPlayer.isSeekable())
+                    vlcPlayer.setTime(Math.max(0, vlcPlayer.getTime() - 10000));
+            });
+            rewind.setTextSize(13);
+            controls.addView(rewind, new LinearLayout.LayoutParams(dp(84), dp(48)));
+            Button forward = tile("10s »", Color.rgb(25, 42, 75), () -> {
+                if (vlcPlayer != null && vlcPlayer.isSeekable())
+                    vlcPlayer.setTime(Math.min(vlcPlayer.getLength(), vlcPlayer.getTime() + 10000));
+            });
+            forward.setTextSize(13);
+            controls.addView(forward, new LinearLayout.LayoutParams(dp(84), dp(48)));
+        }
+        Button audio = tile("AUDIO", Color.rgb(25, 42, 75), () -> {
+            if (vlcPlayer == null) return;
+            org.videolan.libvlc.MediaPlayer.TrackDescription[] tracks = vlcPlayer.getAudioTracks();
+            if (tracks == null || tracks.length == 0) return;
+            String[] labels = new String[tracks.length];
+            for (int i = 0; i < tracks.length; i++) labels[i] = tracks[i].name;
+            new android.app.AlertDialog.Builder(this).setTitle("Audio track")
+                .setItems(labels, (dialog, index) -> vlcPlayer.setAudioTrack(tracks[index].id)).show();
+        });
+        audio.setTextSize(12);
+        controls.addView(audio, new LinearLayout.LayoutParams(dp(80), dp(48)));
+        Button subs = tile("SUBS", Color.rgb(25, 42, 75), () -> {
+            if (vlcPlayer == null) return;
+            org.videolan.libvlc.MediaPlayer.TrackDescription[] tracks = vlcPlayer.getSpuTracks();
+            if (tracks == null || tracks.length == 0) return;
+            String[] labels = new String[tracks.length];
+            for (int i = 0; i < tracks.length; i++) labels[i] = tracks[i].name;
+            new android.app.AlertDialog.Builder(this).setTitle("Subtitles")
+                .setItems(labels, (dialog, index) -> vlcPlayer.setSpuTrack(tracks[index].id)).show();
+        });
+        subs.setTextSize(12);
+        controls.addView(subs, new LinearLayout.LayoutParams(dp(76), dp(48)));
         TextView status = text("VLC software decoder • Loading...");
         status.setTextSize(13);
         controls.addView(status, new LinearLayout.LayoutParams(0, -2, 1));
+        controls.setVisibility(View.VISIBLE);
+        vlcVideo.setOnClickListener(v -> controls.setVisibility(controls.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE));
         try {
             java.util.ArrayList<String> options = new java.util.ArrayList<>();
             options.add("--network-caching=1200");
