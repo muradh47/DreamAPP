@@ -1616,10 +1616,10 @@ public class MainActivity extends Activity {
         panel.setOrientation(LinearLayout.VERTICAL);
         panel.setPadding(dp(12), dp(7), dp(12), dp(8));
         panel.setBackgroundColor(Color.argb(218, 8, 20, 44));
-        android.widget.FrameLayout.LayoutParams panelParams = new android.widget.FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM);
+        android.widget.FrameLayout.LayoutParams panelParams = new android.widget.FrameLayout.LayoutParams(-1, -2, Gravity.CENTER);
         frame.addView(panel, panelParams);
         LinearLayout controls = new LinearLayout(this);
-        controls.setGravity(Gravity.CENTER_VERTICAL);
+        controls.setGravity(Gravity.CENTER);
         if (!type.equals("live")) {
             LinearLayout timeline = new LinearLayout(this);
             timeline.setGravity(Gravity.CENTER_VERTICAL);
@@ -1701,6 +1701,22 @@ public class MainActivity extends Activity {
             forward.setTextSize(13);
             controls.addView(forward, new LinearLayout.LayoutParams(dp(84), dp(48)));
         }
+        Button size = tile("SIZE", Color.rgb(25, 42, 75), () -> {
+            if (vlcPlayer == null) return;
+            String[] modes = {"Fit screen", "Fill screen (crop)", "Stretch to screen", "16:9", "4:3"};
+            new android.app.AlertDialog.Builder(this).setTitle("Video size")
+                .setSingleChoiceItems(modes, -1, (dialog, choice) -> {
+                    if (vlcPlayer == null) return;
+                    if (choice == 0) { vlcPlayer.setAspectRatio(null); vlcPlayer.setScale(0); }
+                    else if (choice == 1) { vlcPlayer.setAspectRatio(null); vlcPlayer.setScale(1.25f); }
+                    else if (choice == 2) { vlcPlayer.setAspectRatio("16:9"); vlcPlayer.setScale(0); }
+                    else if (choice == 3) { vlcPlayer.setAspectRatio("16:9"); vlcPlayer.setScale(0); }
+                    else { vlcPlayer.setAspectRatio("4:3"); vlcPlayer.setScale(0); }
+                    dialog.dismiss();
+                }).show();
+        });
+        size.setTextSize(12);
+        controls.addView(size, new LinearLayout.LayoutParams(dp(75), dp(48)));
         Button audio = tile("AUDIO", Color.rgb(25, 42, 75), () -> {
             if (vlcPlayer == null) return;
             org.videolan.libvlc.MediaPlayer.TrackDescription[] tracks = vlcPlayer.getAudioTracks();
@@ -1764,6 +1780,19 @@ public class MainActivity extends Activity {
     }
 
     private void play(String type, String id, String ext) {
+        if (type.equals("vod") || type.equals("series")) {
+            String folder = type.equals("vod") ? "movie" : "series";
+            String safeExt = ext != null && ext.matches("[a-zA-Z0-9]{1,5}") ? ext : "mp4";
+            String url = server + "/" + folder + "/" + path(username) + "/" + path(password)
+                + "/" + path(id) + "." + safeExt;
+            setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+            getWindow().getDecorView().setSystemUiVisibility(
+                View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION |
+                View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
+            playWithVlc(type, id, ext, url);
+            return;
+        }
+
         releasePlayer();
         setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
         getWindow().getDecorView().setSystemUiVisibility(
