@@ -53,6 +53,8 @@ public class MainActivity extends Activity {
         username = getPreferences(0).getString("username", "");
         password = getPreferences(0).getString("password", "");
         showSplash();
+        new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(
+            this::checkForUpdatesOnLaunch, 3000);
     }
 
     // Page 1: branded splash screen. No network requests or unnecessary loading delay.
@@ -1544,6 +1546,43 @@ public class MainActivity extends Activity {
                 } else status.setText("Playback failed: " + error.getMessage());
             }
         });
+    }
+
+    // Check the published GitHub Release once after launch, without blocking the UI.
+    private void checkForUpdatesOnLaunch() {
+        new Thread(() -> {
+            try {
+                JSONObject release = new JSONObject(fetchAbsolute(RELEASES_API));
+                String tag = release.optString("tag_name", "").replaceFirst("^[vV]", "");
+                if (tag.isEmpty() || compareVersions(tag, BuildConfig.VERSION_NAME) <= 0) return;
+                JSONArray assets = release.optJSONArray("assets");
+                String apkUrl = "";
+                if (assets != null) for (int i = 0; i < assets.length(); i++) {
+                    JSONObject asset = assets.optJSONObject(i);
+                    if (asset != null && asset.optString("name", "").endsWith(".apk")) {
+                        apkUrl = asset.optString("browser_download_url", "");
+                        break;
+                    }
+                }
+                if (!apkUrl.startsWith("https://github.com/")) return;
+                final String url = apkUrl;
+                runOnUiThread(() -> {
+                    if (isFinishing() || (android.os.Build.VERSION.SDK_INT >= 17 && isDestroyed())) return;
+                    new android.app.AlertDialog.Builder(this)
+                        .setTitle("Dream IPTV update available")
+                        .setMessage("Version " + tag + " is ready.\\nInstalled: " +
+                            BuildConfig.VERSION_NAME + "\\n\\nDownload and install the update?")
+                        .setPositiveButton("DOWNLOAD UPDATE", (dialog, which) -> {
+                            TextView downloadStatus = new TextView(this);
+                            downloadUpdate(url, downloadStatus);
+                        })
+                        .setNegativeButton("LATER", null)
+                        .show();
+                });
+            } catch (Exception ignored) {
+                // No network connection: keep the app usable; manual check remains in Settings.
+            }
+        }).start();
     }
 
     private void checkUpdates() {
