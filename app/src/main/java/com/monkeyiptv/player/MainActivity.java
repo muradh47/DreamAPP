@@ -347,7 +347,7 @@ public class MainActivity extends Activity {
             Color.rgb(0, 88, 213), () -> showLiveDashboard());
         addHomeTile(primary, live, compact ? 126 : 196);
         addHomeTile(primary, homeTile("🎬\nMOVIES",
-            Color.rgb(219, 32, 45), () -> showCategories("vod")), compact ? 126 : 196);
+            Color.rgb(219, 32, 45), this::showMovieDashboard), compact ? 126 : 196);
         addHomeTile(primary, homeTile("🎭\nSERIES",
             Color.rgb(98, 14, 180), () -> showCategories("series")), compact ? 126 : 196);
 
@@ -1056,6 +1056,110 @@ public class MainActivity extends Activity {
         LinearLayout schedule = new LinearLayout(this);
         int request = ++epgRequest;
         loadChannelEpg(id, request, liveDashboardNow, liveDashboardNext, schedule, true);
+    }
+
+    // Movies: Smarters-inspired sidebar and poster wall, using the IPTV provider's real VOD catalogue.
+    private void showMovieDashboard() {
+        releasePlayer();
+        currentType = "vod";
+        ++browseRequest;
+        setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
+        getWindow().getDecorView().setSystemUiVisibility(0);
+        LinearLayout page = new LinearLayout(this);
+        page.setOrientation(LinearLayout.VERTICAL);
+        page.setFitsSystemWindows(true);
+        page.setBackgroundColor(Color.rgb(9, 17, 37));
+        setContentView(page);
+        LinearLayout header = new LinearLayout(this);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        header.setPadding(dp(10), dp(5), dp(10), dp(5));
+        page.addView(header, new LinearLayout.LayoutParams(-1, dp(58)));
+        Button home = tile("‹ HOME", Color.rgb(25, 42, 75), this::showHome);
+        home.setTextSize(14);
+        header.addView(home, new LinearLayout.LayoutParams(dp(90), dp(44)));
+        TextView title = text("  DREAM IPTV  /  MOVIES");
+        title.setTypeface(Typeface.DEFAULT_BOLD);
+        title.setTextSize(19);
+        header.addView(title, new LinearLayout.LayoutParams(0, -2, 1));
+        Button search = tile("⌕", Color.rgb(25, 42, 75), () -> {
+            EditText input = new EditText(this);
+            input.setSingleLine(true);
+            input.setHint("Search movie titles");
+            new android.app.AlertDialog.Builder(this).setTitle("Search movies").setView(input)
+                .setPositiveButton("SEARCH", (dialog, which) -> {
+                    String q = input.getText().toString().trim().toLowerCase(java.util.Locale.ROOT);
+                    if (currentItems == null) return;
+                    JSONArray matches = new JSONArray();
+                    for (int i = 0; i < currentItems.length(); i++) {
+                        JSONObject movie = currentItems.optJSONObject(i);
+                        if (movie != null && movie.optString("name", "").toLowerCase(java.util.Locale.ROOT).contains(q))
+                            matches.put(movie);
+                    }
+                    currentItems = matches;
+                    nextItemIndex = 0;
+                    contentGrid.removeAllViews();
+                    browserHeading.setText("SEARCH RESULTS");
+                    appendNextPage();
+                }).setNegativeButton("CANCEL", null).show();
+        });
+        header.addView(search, new LinearLayout.LayoutParams(dp(52), dp(44)));
+        LinearLayout body = new LinearLayout(this);
+        body.setOrientation(LinearLayout.HORIZONTAL);
+        page.addView(body, new LinearLayout.LayoutParams(-1, 0, 1));
+        int width = getResources().getDisplayMetrics().widthPixels;
+        int sideWidth = Math.min(dp(255), Math.max(dp(150), width / 4));
+        ScrollView sidebarScroll = new ScrollView(this);
+        sidebarScroll.setBackgroundColor(Color.rgb(15, 29, 58));
+        body.addView(sidebarScroll, new LinearLayout.LayoutParams(sideWidth, -1));
+        categorySidebar = new LinearLayout(this);
+        categorySidebar.setOrientation(LinearLayout.VERTICAL);
+        categorySidebar.setPadding(dp(5), dp(6), dp(5), dp(6));
+        sidebarScroll.addView(categorySidebar);
+        LinearLayout main = new LinearLayout(this);
+        main.setOrientation(LinearLayout.VERTICAL);
+        main.setPadding(dp(6), dp(4), dp(6), 0);
+        body.addView(main, new LinearLayout.LayoutParams(0, -1, 1));
+        browserHeading = text("ALL MOVIES");
+        browserHeading.setTypeface(Typeface.DEFAULT_BOLD);
+        browserHeading.setTextSize(19);
+        browserHeading.setPadding(dp(6), dp(8), 0, dp(8));
+        main.addView(browserHeading);
+        ScrollView posterScroll = new ScrollView(this);
+        main.addView(posterScroll, new LinearLayout.LayoutParams(-1, 0, 1));
+        contentGrid = new GridLayout(this);
+        contentGrid.setColumnCount(width >= dp(950) ? 5 : width >= dp(620) ? 4 : 3);
+        contentGrid.setPadding(dp(2), dp(2), dp(2), dp(8));
+        posterScroll.addView(contentGrid);
+        sidebarItem("ALL MOVIES", true, () -> { browserHeading.setText("ALL MOVIES"); showItems("vod", ""); });
+        JSONArray cached = categoryCache.get("vod");
+        if (cached != null) renderMovieSidebar(cached);
+        else new Thread(() -> {
+            try {
+                JSONArray categories = new JSONArray(fetch(api(username, password, "get_vod_categories")));
+                categoryCache.put("vod", categories);
+                runOnUiThread(() -> {
+                    if (categorySidebar.getParent() != null) renderMovieSidebar(categories);
+                });
+            } catch (Exception ignored) {
+                runOnUiThread(() -> sidebarItem("RETRY CATEGORIES", false, this::showMovieDashboard));
+            }
+        }).start();
+        showItems("vod", "");
+    }
+
+    private void renderMovieSidebar(JSONArray categories) {
+        categorySidebar.removeAllViews();
+        sidebarItem("ALL MOVIES", true, () -> { browserHeading.setText("ALL MOVIES"); showItems("vod", ""); });
+        for (int i = 0; i < categories.length(); i++) {
+            JSONObject c = categories.optJSONObject(i);
+            if (c == null) continue;
+            String id = c.optString("category_id");
+            String name = c.optString("category_name", "Movies");
+            sidebarItem(name, false, () -> {
+                browserHeading.setText(name.toUpperCase(java.util.Locale.ROOT));
+                showItems("vod", id);
+            });
+        }
     }
 
     private void showCategories(String type) {
