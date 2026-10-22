@@ -592,7 +592,9 @@ public class MainActivity extends Activity {
                 else if (state == Player.STATE_BUFFERING) playerStatus.setText("Buffering...");
             }
             @Override public void onPlayerError(PlaybackException error) {
-                playerStatus.setText("Stream error: " + error.getErrorCodeName());
+                playerStatus.setText("Switching to VLC software decoder...");
+                String url = server + "/live/" + path(username) + "/" + path(password) + "/" + path(id) + ".m3u8";
+                playWithVlc("live", id, "m3u8", url);
             }
         });
         tapArea.requestFocus();
@@ -1580,6 +1582,73 @@ public class MainActivity extends Activity {
         }).start();
     }
 
+    private org.videolan.libvlc.LibVLC vlcEngine;
+    private org.videolan.libvlc.MediaPlayer vlcPlayer;
+    private org.videolan.libvlc.util.VLCVideoLayout vlcVideo;
+
+    private void releaseVlc() {
+        if (vlcPlayer != null) {
+            vlcPlayer.stop();
+            vlcPlayer.detachViews();
+            vlcPlayer.release();
+            vlcPlayer = null;
+        }
+        if (vlcEngine != null) { vlcEngine.release(); vlcEngine = null; }
+        vlcVideo = null;
+    }
+
+    // Native VLC fallback supplies its own software codecs when Android MediaCodec cannot play a stream.
+    private void playWithVlc(String type, String id, String ext, String originalUrl) {
+        releasePlayer();
+        releaseVlc();
+        android.widget.FrameLayout frame = new android.widget.FrameLayout(this);
+        frame.setBackgroundColor(Color.BLACK);
+        setContentView(frame);
+        vlcVideo = new org.videolan.libvlc.util.VLCVideoLayout(this);
+        frame.addView(vlcVideo, new android.widget.FrameLayout.LayoutParams(-1, -1));
+        LinearLayout controls = new LinearLayout(this);
+        controls.setGravity(Gravity.CENTER_VERTICAL);
+        controls.setBackgroundColor(Color.argb(200, 8, 20, 44));
+        android.widget.FrameLayout.LayoutParams cp = new android.widget.FrameLayout.LayoutParams(-1, dp(55), Gravity.BOTTOM);
+        frame.addView(controls, cp);
+        Button back = tile("‹ BACK", Color.rgb(25, 42, 75), () -> {
+            releaseVlc();
+            if (type.equals("live")) showLiveDashboard(); else showMovieDashboard();
+        });
+        back.setTextSize(14);
+        controls.addView(back, new LinearLayout.LayoutParams(dp(105), dp(48)));
+        Button toggle = tile("PAUSE", Color.rgb(25, 42, 75), () -> {
+            if (vlcPlayer == null) return;
+            if (vlcPlayer.isPlaying()) { vlcPlayer.pause(); }
+            else vlcPlayer.play();
+        });
+        toggle.setTextSize(14);
+        controls.addView(toggle, new LinearLayout.LayoutParams(dp(100), dp(48)));
+        TextView status = text("VLC software decoder • Loading...");
+        status.setTextSize(13);
+        controls.addView(status, new LinearLayout.LayoutParams(0, -2, 1));
+        try {
+            java.util.ArrayList<String> options = new java.util.ArrayList<>();
+            options.add("--network-caching=1200");
+            options.add("--avcodec-hw=none");
+            vlcEngine = new org.videolan.libvlc.LibVLC(this, options);
+            vlcPlayer = new org.videolan.libvlc.MediaPlayer(vlcEngine);
+            vlcPlayer.attachViews(vlcVideo, null, false, false);
+            org.videolan.libvlc.Media media = new org.videolan.libvlc.Media(vlcEngine, Uri.parse(originalUrl));
+            media.addOption(":network-caching=1200");
+            vlcPlayer.setMedia(media);
+            media.release();
+            vlcPlayer.setEventListener(event -> runOnUiThread(() -> {
+                if (vlcPlayer == null) return;
+                if (event.type == org.videolan.libvlc.MediaPlayer.Event.Playing) status.setText("VLC • Playing");
+                else if (event.type == org.videolan.libvlc.MediaPlayer.Event.EncounteredError)
+                    status.setText("VLC cannot play this stream. Check the provider format.");
+                toggle.setText(vlcPlayer.isPlaying() ? "PAUSE" : "PLAY");
+            }));
+            vlcPlayer.play();
+        } catch (Exception error) { status.setText("VLC failed: " + error.getMessage()); }
+    }
+
     private void play(String type, String id, String ext) {
         releasePlayer();
         setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
@@ -1623,7 +1692,8 @@ public class MainActivity extends Activity {
                     player.setMediaItem(MediaItem.fromUri(hls));
                     player.prepare(); player.play();
                 } else {
-                    playbackStatus.setText("Playback failed: " + error.getErrorCodeName() + " - " + error.getMessage() + "\\nCheck that the account allows streaming and the provider supports this format.");
+                    playbackStatus.setText("Switching to VLC software decoder...");
+                    playWithVlc(type, id, ext, initialStream);
                 }
             }
         });
@@ -1882,7 +1952,7 @@ public class MainActivity extends Activity {
         } finally { c.disconnect(); }
     }
 
-    private void releasePlayer() { ++epgRequest; if (epgRefresh != null) { epgHandler.removeCallbacks(epgRefresh); epgRefresh = null; } if (player != null) { player.release(); player = null; } }
+    private void releasePlayer() { releaseVlc(); ++epgRequest; if (epgRefresh != null) { epgHandler.removeCallbacks(epgRefresh); epgRefresh = null; } if (player != null) { player.release(); player = null; } }
     @Override protected void onDestroy() { if (updateReceiver != null) { unregisterReceiver(updateReceiver); updateReceiver = null; } super.onDestroy(); }
     @Override protected void onStop() { super.onStop(); releasePlayer(); }
     @Override public void onBackPressed() {
