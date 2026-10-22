@@ -1381,6 +1381,8 @@ public class MainActivity extends Activity {
         });
     }
 
+    private int moviePosterHeight(String type) { return type.equals("vod") && categorySidebar != null && categorySidebar.getParent() != null ? dp(146) : dp(105); }
+
     private void channelCard(String name, String logo, String type, String id, String ext, JSONObject metadata) {
         if (type.equals("live")) {
             LinearLayout row = new LinearLayout(this);
@@ -1444,7 +1446,7 @@ public class MainActivity extends Activity {
         image.setImageResource(android.R.drawable.ic_menu_gallery);
         image.setScaleType(ImageView.ScaleType.FIT_CENTER);
         image.setPadding(dp(8), dp(8), dp(8), dp(8));
-        card.addView(image, new LinearLayout.LayoutParams(-1, dp(105)));
+        card.addView(image, new LinearLayout.LayoutParams(-1, moviePosterHeight(type)));
         loadArtwork(logo, image);
         TextView label = text(name);
         label.setTextSize(14);
@@ -1468,7 +1470,13 @@ public class MainActivity extends Activity {
             }
         }
         GridLayout.LayoutParams gp = new GridLayout.LayoutParams();
-        gp.width = dp(155); gp.height = dp(170);
+        boolean movieWall = type.equals("vod") && categorySidebar != null && categorySidebar.getParent() != null;
+        int availableWidth = getResources().getDisplayMetrics().widthPixels
+            - (movieWall ? Math.min(dp(255), Math.max(dp(150), getResources().getDisplayMetrics().widthPixels / 4)) : dp(16))
+            - dp(26);
+        int cols = contentGrid.getColumnCount();
+        gp.width = movieWall ? Math.max(dp(95), availableWidth / cols - dp(12)) : dp(155);
+        gp.height = movieWall ? dp(214) : dp(170);
         gp.setMargins(dp(6), dp(6), dp(6), dp(6));
         contentGrid.addView(card, gp);
 
