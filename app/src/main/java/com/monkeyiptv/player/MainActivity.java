@@ -797,6 +797,9 @@ public class MainActivity extends Activity {
     private String liveDashboardSelectedId = "", liveDashboardSelectedName = "";
     private final java.util.Map<String, LinearLayout> liveDashboardCards = new java.util.HashMap<>();
     private int liveDashboardRequest = 0;
+    private String liveDashboardCategoryId = "";
+    private final java.util.Map<String, String> liveDashboardCardNames = new java.util.HashMap<>();
+    private TextView liveDashboardPreviewBadge;
 
     private void showLiveDashboard() {
         releasePlayer();
@@ -804,6 +807,7 @@ public class MainActivity extends Activity {
         ++browseRequest;
         ++liveDashboardRequest;
         liveDashboardCards.clear();
+        liveDashboardCardNames.clear();
         liveDashboardSelectedId = "";
         liveDashboardSelectedName = "";
         setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
@@ -818,17 +822,32 @@ public class MainActivity extends Activity {
         header.setPadding(dp(12), dp(5), dp(12), dp(5));
         page.addView(header, new LinearLayout.LayoutParams(-1, dp(56)));
         Button home = tile("‹ HOME", Color.rgb(25, 42, 75), this::showHome);
-        header.addView(home, new LinearLayout.LayoutParams(dp(100), dp(46)));
+        header.addView(home, new LinearLayout.LayoutParams(dp(86), dp(42)));
         TextView brand = text("  DREAM IPTV  /  LIVE");
-        brand.setTextSize(19);
+        brand.setTextSize(18);
         brand.setTypeface(Typeface.DEFAULT_BOLD);
         header.addView(brand, new LinearLayout.LayoutParams(0, -2, 1));
-        Button full = tile("⛶ FULLSCREEN", Color.rgb(28, 85, 157), () -> {
+        Button full = tile("⛶ FULL", Color.rgb(28, 85, 157), () -> {
             if (!liveDashboardSelectedId.isEmpty())
                 showFullscreenLive(liveDashboardSelectedId, liveDashboardSelectedName, false);
         });
         full.setTextSize(12);
-        header.addView(full, new LinearLayout.LayoutParams(dp(132), dp(44)));
+        Button searchLive = tile("⌕", Color.rgb(25, 42, 75), () -> {
+            final android.widget.EditText query = new android.widget.EditText(this);
+            query.setSingleLine(true);
+            query.setHint("Search channels");
+            new android.app.AlertDialog.Builder(this).setTitle("Find a channel")
+                .setView(query).setPositiveButton("SEARCH", (dialog, which) -> {
+                    String needle = query.getText().toString().trim().toLowerCase(java.util.Locale.ROOT);
+                    for (java.util.Map.Entry<String, LinearLayout> entry : liveDashboardCards.entrySet()) {
+                        String name = liveDashboardCardNames.get(entry.getKey());
+                        entry.getValue().setVisibility(name != null && name.toLowerCase(java.util.Locale.ROOT).contains(needle)
+                            ? View.VISIBLE : View.GONE);
+                    }
+                }).setNegativeButton("CANCEL", null).show();
+        });
+        header.addView(searchLive, new LinearLayout.LayoutParams(dp(45), dp(42)));
+        header.addView(full, new LinearLayout.LayoutParams(dp(90), dp(42)));
 
         LinearLayout body = new LinearLayout(this);
         body.setOrientation(LinearLayout.HORIZONTAL);
@@ -849,11 +868,20 @@ public class MainActivity extends Activity {
 
         LinearLayout previewRow = new LinearLayout(this);
         previewRow.setOrientation(LinearLayout.HORIZONTAL);
-        main.addView(previewRow, new LinearLayout.LayoutParams(-1, dp(190)));
+        main.addView(previewRow, new LinearLayout.LayoutParams(-1, dp(220)));
+        android.widget.FrameLayout previewFrame = new android.widget.FrameLayout(this);
+        previewRow.addView(previewFrame, new LinearLayout.LayoutParams(0, -1, 3));
         liveDashboardPreview = new PlayerView(this);
         liveDashboardPreview.setUseController(true);
         liveDashboardPreview.setBackgroundColor(Color.BLACK);
-        previewRow.addView(liveDashboardPreview, new LinearLayout.LayoutParams(0, -1, 3));
+        previewFrame.addView(liveDashboardPreview, new android.widget.FrameLayout.LayoutParams(-1, -1));
+        liveDashboardPreviewBadge = text("● LIVE  •  Select a channel");
+        liveDashboardPreviewBadge.setTextSize(12);
+        liveDashboardPreviewBadge.setTypeface(Typeface.DEFAULT_BOLD);
+        liveDashboardPreviewBadge.setBackgroundColor(Color.argb(190, 9, 24, 48));
+        liveDashboardPreviewBadge.setPadding(dp(9), dp(5), dp(9), dp(5));
+        android.widget.FrameLayout.LayoutParams badgeParams = new android.widget.FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM);
+        previewFrame.addView(liveDashboardPreviewBadge, badgeParams);
         LinearLayout epg = new LinearLayout(this);
         epg.setOrientation(LinearLayout.VERTICAL);
         epg.setPadding(dp(12), dp(8), dp(5), dp(8));
@@ -864,11 +892,11 @@ public class MainActivity extends Activity {
         liveDashboardTitle.setTypeface(Typeface.DEFAULT_BOLD);
         liveDashboardTitle.setMaxLines(2);
         epg.addView(liveDashboardTitle);
-        liveDashboardNow = text("NOW  •  Select a channel to preview");
+        liveDashboardNow = text("NOW PLAYING\nSelect a channel to preview");
         liveDashboardNow.setTextSize(13);
         liveDashboardNow.setPadding(0, dp(12), 0, dp(6));
         epg.addView(liveDashboardNow);
-        liveDashboardNext = text("NEXT  •  Programme guide");
+        liveDashboardNext = text("UP NEXT\nProgramme guide");
         liveDashboardNext.setTextSize(13);
         epg.addView(liveDashboardNext);
         TextView heading = text("CHANNELS");
@@ -915,15 +943,17 @@ public class MainActivity extends Activity {
         button.setTextSize(13);
         button.setSingleLine(true);
         button.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, dp(52));
-        params.setMargins(dp(2), dp(3), dp(2), dp(3));
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, dp(43));
+        params.setMargins(dp(2), dp(2), dp(2), dp(2));
         liveDashboardCategories.addView(button, params);
     }
 
     private void selectLiveDashboardCategory(String categoryId, String label) {
+        liveDashboardCategoryId = categoryId;
         int request = ++liveDashboardRequest;
         liveDashboardChannels.removeAllViews();
         liveDashboardCards.clear();
+        liveDashboardCardNames.clear();
         liveDashboardChannels.addView(text("Loading " + label + "..."));
         new Thread(() -> {
             try {
@@ -943,7 +973,7 @@ public class MainActivity extends Activity {
                         LinearLayout card = new LinearLayout(this);
                         card.setOrientation(LinearLayout.VERTICAL);
                         card.setGravity(Gravity.CENTER);
-                        card.setPadding(dp(5), dp(5), dp(5), dp(5));
+                        card.setPadding(dp(8), dp(7), dp(8), dp(7));
                         card.setBackgroundColor(Color.rgb(25, 38, 65));
                         card.setFocusable(true);
                         card.setClickable(true);
@@ -971,10 +1001,12 @@ public class MainActivity extends Activity {
                                 ? Color.rgb(17, 122, 194)
                                 : focused ? Color.rgb(48, 91, 192) : Color.rgb(25, 38, 65)));
                         liveDashboardCards.put(id, card);
+                        liveDashboardCardNames.put(id, name);
+                        if (id.equals(liveDashboardSelectedId)) card.setBackgroundColor(Color.rgb(17, 122, 194));
                         ImageView logo = new ImageView(this);
                         logo.setImageResource(android.R.drawable.ic_media_play);
                         logo.setScaleType(ImageView.ScaleType.FIT_CENTER);
-                        card.addView(logo, new LinearLayout.LayoutParams(-1, dp(44)));
+                        card.addView(logo, new LinearLayout.LayoutParams(-1, dp(34)));
                         loadArtwork(item.optString("stream_icon"), logo);
                         TextView title = text(name);
                         title.setTextSize(12);
@@ -993,7 +1025,7 @@ public class MainActivity extends Activity {
                         int mainWidth = getResources().getDisplayMetrics().widthPixels -
                             Math.min(dp(235), Math.max(dp(145), getResources().getDisplayMetrics().widthPixels / 4)) - dp(30);
                         params.width = Math.max(dp(110), mainWidth / 3 - dp(9));
-                        params.height = dp(116);
+                        params.height = dp(126);
                         params.setMargins(dp(3), dp(3), dp(3), dp(3));
                         liveDashboardChannels.addView(card, params);
                     }
@@ -1019,8 +1051,9 @@ public class MainActivity extends Activity {
             entry.getValue().setContentDescription((playing ? "NOW PLAYING: " : "") + entry.getKey());
         }
         liveDashboardTitle.setText(name);
-        liveDashboardNow.setText("NOW  •  Loading...");
-        liveDashboardNext.setText("NEXT  •  Loading...");
+        liveDashboardPreviewBadge.setText("● LIVE  •  " + name);
+        liveDashboardNow.setText("NOW PLAYING\nLoading...");
+        liveDashboardNext.setText("UP NEXT\nLoading...");
         startStream("live", id, "ts", liveDashboardPreview);
         TextView status = liveDashboardNow;
         attachPlaybackStatus(status, id);
