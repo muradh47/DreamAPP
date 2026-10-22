@@ -827,11 +827,6 @@ public class MainActivity extends Activity {
         brand.setTextSize(18);
         brand.setTypeface(Typeface.DEFAULT_BOLD);
         header.addView(brand, new LinearLayout.LayoutParams(0, -2, 1));
-        Button full = tile("⛶ FULL", Color.rgb(28, 85, 157), () -> {
-            if (!liveDashboardSelectedId.isEmpty())
-                showFullscreenLive(liveDashboardSelectedId, liveDashboardSelectedName, false);
-        });
-        full.setTextSize(12);
         Button searchLive = tile("⌕", Color.rgb(25, 42, 75), () -> {
             final android.widget.EditText query = new android.widget.EditText(this);
             query.setSingleLine(true);
@@ -847,7 +842,6 @@ public class MainActivity extends Activity {
                 }).setNegativeButton("CANCEL", null).show();
         });
         header.addView(searchLive, new LinearLayout.LayoutParams(dp(45), dp(42)));
-        header.addView(full, new LinearLayout.LayoutParams(dp(90), dp(42)));
 
         LinearLayout body = new LinearLayout(this);
         body.setOrientation(LinearLayout.HORIZONTAL);
@@ -872,7 +866,7 @@ public class MainActivity extends Activity {
         android.widget.FrameLayout previewFrame = new android.widget.FrameLayout(this);
         previewRow.addView(previewFrame, new LinearLayout.LayoutParams(0, -1, 3));
         liveDashboardPreview = new PlayerView(this);
-        liveDashboardPreview.setUseController(true);
+        liveDashboardPreview.setUseController(false);
         liveDashboardPreview.setBackgroundColor(Color.BLACK);
         previewFrame.addView(liveDashboardPreview, new android.widget.FrameLayout.LayoutParams(-1, -1));
         liveDashboardPreviewBadge = text("● LIVE  •  Select a channel");
