@@ -1614,9 +1614,9 @@ public class MainActivity extends Activity {
         frame.addView(vlcVideo, new android.widget.FrameLayout.LayoutParams(-1, -1));
         LinearLayout panel = new LinearLayout(this);
         panel.setOrientation(LinearLayout.VERTICAL);
-        panel.setPadding(dp(12), dp(7), dp(12), dp(8));
-        panel.setBackgroundColor(Color.argb(218, 8, 20, 44));
-        android.widget.FrameLayout.LayoutParams panelParams = new android.widget.FrameLayout.LayoutParams(-1, -2, Gravity.CENTER);
+        panel.setPadding(dp(22), dp(12), dp(22), dp(14));
+        panel.setBackgroundColor(Color.argb(190, 5, 12, 27));
+        android.widget.FrameLayout.LayoutParams panelParams = new android.widget.FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM);
         frame.addView(panel, panelParams);
         LinearLayout controls = new LinearLayout(this);
         controls.setGravity(Gravity.CENTER);
@@ -1625,14 +1625,14 @@ public class MainActivity extends Activity {
             timeline.setGravity(Gravity.CENTER_VERTICAL);
             TextView elapsed = text("00:00");
             elapsed.setTextSize(13);
-            timeline.addView(elapsed, new LinearLayout.LayoutParams(dp(58), -2));
+            timeline.addView(elapsed, new LinearLayout.LayoutParams(dp(82), -2));
             SeekBar seek = new SeekBar(this);
             seek.setMax(1000);
             seek.setFocusable(true);
             timeline.addView(seek, new LinearLayout.LayoutParams(0, dp(42), 1));
             TextView duration = text("00:00");
             duration.setTextSize(13);
-            timeline.addView(duration, new LinearLayout.LayoutParams(dp(62), -2));
+            timeline.addView(duration, new LinearLayout.LayoutParams(dp(82), -2));
             panel.addView(timeline, new LinearLayout.LayoutParams(-1, dp(45)));
             seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
                 private boolean dragging = false;
@@ -1673,20 +1673,20 @@ public class MainActivity extends Activity {
             };
             progressHandler.post(progressUpdate);
         }
-        panel.addView(controls, new LinearLayout.LayoutParams(-1, dp(54)));
+        panel.addView(controls, new LinearLayout.LayoutParams(-1, dp(62)));
         Button back = tile("‹ BACK", Color.rgb(25, 42, 75), () -> {
             releaseVlc();
             if (type.equals("live")) showLiveDashboard(); else showMovieDashboard();
         });
-        back.setTextSize(14);
-        controls.addView(back, new LinearLayout.LayoutParams(dp(105), dp(48)));
+        back.setTextSize(13);
+        controls.addView(back, new LinearLayout.LayoutParams(dp(88), dp(50)));
         Button toggle = tile("PAUSE", Color.rgb(25, 42, 75), () -> {
             if (vlcPlayer == null) return;
             if (vlcPlayer.isPlaying()) { vlcPlayer.pause(); }
             else vlcPlayer.play();
         });
         toggle.setTextSize(14);
-        controls.addView(toggle, new LinearLayout.LayoutParams(dp(100), dp(48)));
+        controls.addView(toggle, new LinearLayout.LayoutParams(dp(108), dp(54)));
         if (!type.equals("live")) {
             Button rewind = tile("« 10s", Color.rgb(25, 42, 75), () -> {
                 if (vlcPlayer != null && vlcPlayer.isSeekable())
@@ -1741,22 +1741,40 @@ public class MainActivity extends Activity {
         controls.addView(subs, new LinearLayout.LayoutParams(dp(76), dp(48)));
         TextView status = text("VLC software decoder • Loading...");
         status.setTextSize(13);
-        controls.addView(status, new LinearLayout.LayoutParams(0, -2, 1));
+        status.setVisibility(View.GONE);
+        panel.addView(status, new LinearLayout.LayoutParams(-1, -2));
+        // Movie-player style: unobstructed video with a compact bottom transport overlay.
         panel.setVisibility(View.VISIBLE);
+        android.os.Handler hideHandler = new android.os.Handler(android.os.Looper.getMainLooper());
+        Runnable hideControls = () -> { if (panel.getParent() != null) panel.setVisibility(View.GONE); };
+        Runnable revealControls = () -> {
+            panel.setVisibility(View.VISIBLE);
+            hideHandler.removeCallbacks(hideControls);
+            hideHandler.postDelayed(hideControls, 5500);
+        };
+        revealControls.run();
         vlcVideo.setOnClickListener(v -> {
-            panel.setVisibility(panel.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE);
-            if (panel.getVisibility() == View.VISIBLE) toggle.requestFocus();
+            if (panel.getVisibility() == View.VISIBLE) { panel.setVisibility(View.GONE); hideHandler.removeCallbacks(hideControls); }
+            else { revealControls.run(); toggle.requestFocus(); }
         });
         vlcVideo.setFocusable(true);
         vlcVideo.setOnKeyListener((v, key, event) -> {
             if (event.getAction() != android.view.KeyEvent.ACTION_DOWN) return false;
             if (key == android.view.KeyEvent.KEYCODE_DPAD_CENTER || key == android.view.KeyEvent.KEYCODE_ENTER) {
-                panel.setVisibility(View.VISIBLE);
+                revealControls.run();
                 toggle.requestFocus();
                 return true;
             }
             return false;
         });
+        // Touch and remote navigation refreshes the visibility timeout.
+        for (int i = 0; i < controls.getChildCount(); i++) {
+            View control = controls.getChildAt(i);
+            control.setOnFocusChangeListener((v, focused) -> {
+                if (focused) { hideHandler.removeCallbacks(hideControls); panel.setVisibility(View.VISIBLE); }
+                else hideHandler.postDelayed(hideControls, 5500);
+            });
+        }
         try {
             java.util.ArrayList<String> options = new java.util.ArrayList<>();
             options.add("--network-caching=1200");
