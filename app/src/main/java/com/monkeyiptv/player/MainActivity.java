@@ -1598,6 +1598,12 @@ public class MainActivity extends Activity {
     }
 
     // Native VLC fallback supplies its own software codecs when Android MediaCodec cannot play a stream.
+    private boolean draggingSeek(SeekBar seek) { return seek.isPressed(); }
+    private String formatVlcTime(long ms) {
+        long seconds = Math.max(0, ms / 1000);
+        return String.format(java.util.Locale.ROOT, "%02d:%02d:%02d", seconds / 3600, (seconds / 60) % 60, seconds % 60);
+    }
+
     private void playWithVlc(String type, String id, String ext, String originalUrl) {
         releasePlayer();
         releaseVlc();
@@ -1606,11 +1612,68 @@ public class MainActivity extends Activity {
         setContentView(frame);
         vlcVideo = new org.videolan.libvlc.util.VLCVideoLayout(this);
         frame.addView(vlcVideo, new android.widget.FrameLayout.LayoutParams(-1, -1));
+        LinearLayout panel = new LinearLayout(this);
+        panel.setOrientation(LinearLayout.VERTICAL);
+        panel.setPadding(dp(12), dp(7), dp(12), dp(8));
+        panel.setBackgroundColor(Color.argb(218, 8, 20, 44));
+        android.widget.FrameLayout.LayoutParams panelParams = new android.widget.FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM);
+        frame.addView(panel, panelParams);
         LinearLayout controls = new LinearLayout(this);
         controls.setGravity(Gravity.CENTER_VERTICAL);
-        controls.setBackgroundColor(Color.argb(200, 8, 20, 44));
-        android.widget.FrameLayout.LayoutParams cp = new android.widget.FrameLayout.LayoutParams(-1, dp(65), Gravity.BOTTOM);
-        frame.addView(controls, cp);
+        if (!type.equals("live")) {
+            LinearLayout timeline = new LinearLayout(this);
+            timeline.setGravity(Gravity.CENTER_VERTICAL);
+            TextView elapsed = text("00:00");
+            elapsed.setTextSize(13);
+            timeline.addView(elapsed, new LinearLayout.LayoutParams(dp(58), -2));
+            SeekBar seek = new SeekBar(this);
+            seek.setMax(1000);
+            seek.setFocusable(true);
+            timeline.addView(seek, new LinearLayout.LayoutParams(0, dp(42), 1));
+            TextView duration = text("00:00");
+            duration.setTextSize(13);
+            timeline.addView(duration, new LinearLayout.LayoutParams(dp(62), -2));
+            panel.addView(timeline, new LinearLayout.LayoutParams(-1, dp(45)));
+            seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+                private boolean dragging = false;
+                @Override public void onStartTrackingTouch(SeekBar bar) { dragging = true; }
+                @Override public void onStopTrackingTouch(SeekBar bar) {
+                    dragging = false;
+                    if (vlcPlayer != null && vlcPlayer.isSeekable() && vlcPlayer.getLength() > 0)
+                        vlcPlayer.setTime(vlcPlayer.getLength() * bar.getProgress() / 1000);
+                }
+                @Override public void onProgressChanged(SeekBar bar, int progress, boolean fromUser) {
+                    if (fromUser && vlcPlayer != null && vlcPlayer.isSeekable() && vlcPlayer.getLength() > 0)
+                        elapsed.setText(formatVlcTime(vlcPlayer.getLength() * progress / 1000));
+                }
+            });
+            seek.setOnKeyListener((v, key, event) -> {
+                if (event.getAction() != android.view.KeyEvent.ACTION_DOWN || vlcPlayer == null || !vlcPlayer.isSeekable()) return false;
+                if (key == android.view.KeyEvent.KEYCODE_DPAD_LEFT || key == android.view.KeyEvent.KEYCODE_DPAD_RIGHT) {
+                    long len = vlcPlayer.getLength();
+                    if (len > 0) vlcPlayer.setTime(Math.max(0, Math.min(len, vlcPlayer.getTime() +
+                        (key == android.view.KeyEvent.KEYCODE_DPAD_LEFT ? -10000 : 10000))));
+                    return true;
+                }
+                return false;
+            });
+            android.os.Handler progressHandler = new android.os.Handler(android.os.Looper.getMainLooper());
+            Runnable progressUpdate = new Runnable() {
+                @Override public void run() {
+                    if (vlcPlayer == null || panel.getParent() == null) return;
+                    long len = vlcPlayer.getLength();
+                    long pos = Math.max(0, vlcPlayer.getTime());
+                    if (len > 0) {
+                        duration.setText(formatVlcTime(len));
+                        if (!draggingSeek(seek)) seek.setProgress((int) Math.min(1000, pos * 1000 / len));
+                    }
+                    elapsed.setText(formatVlcTime(pos));
+                    progressHandler.postDelayed(this, 800);
+                }
+            };
+            progressHandler.post(progressUpdate);
+        }
+        panel.addView(controls, new LinearLayout.LayoutParams(-1, dp(54)));
         Button back = tile("‹ BACK", Color.rgb(25, 42, 75), () -> {
             releaseVlc();
             if (type.equals("live")) showLiveDashboard(); else showMovieDashboard();
@@ -1663,8 +1726,21 @@ public class MainActivity extends Activity {
         TextView status = text("VLC software decoder • Loading...");
         status.setTextSize(13);
         controls.addView(status, new LinearLayout.LayoutParams(0, -2, 1));
-        controls.setVisibility(View.VISIBLE);
-        vlcVideo.setOnClickListener(v -> controls.setVisibility(controls.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE));
+        panel.setVisibility(View.VISIBLE);
+        vlcVideo.setOnClickListener(v -> {
+            panel.setVisibility(panel.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE);
+            if (panel.getVisibility() == View.VISIBLE) toggle.requestFocus();
+        });
+        vlcVideo.setFocusable(true);
+        vlcVideo.setOnKeyListener((v, key, event) -> {
+            if (event.getAction() != android.view.KeyEvent.ACTION_DOWN) return false;
+            if (key == android.view.KeyEvent.KEYCODE_DPAD_CENTER || key == android.view.KeyEvent.KEYCODE_ENTER) {
+                panel.setVisibility(View.VISIBLE);
+                toggle.requestFocus();
+                return true;
+            }
+            return false;
+        });
         try {
             java.util.ArrayList<String> options = new java.util.ArrayList<>();
             options.add("--network-caching=1200");
