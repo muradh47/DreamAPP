@@ -1826,7 +1826,18 @@ public class MainActivity extends Activity {
         page.setFitsSystemWindows(true);
         page.setPadding(dp(16), dp(8), dp(16), dp(8));
         page.setBackgroundColor(Color.rgb(9, 17, 37));
-        setContentView(page);
+        android.widget.FrameLayout scene = new android.widget.FrameLayout(this);
+        ImageView backdrop = new ImageView(this);
+        backdrop.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        backdrop.setAlpha(0.18f);
+        scene.addView(backdrop, new android.widget.FrameLayout.LayoutParams(-1, -1));
+        page.setBackgroundColor(Color.TRANSPARENT);
+        scene.addView(page, new android.widget.FrameLayout.LayoutParams(-1, -1));
+        setContentView(scene);
+        if (listing != null) {
+            String background = movieBackdrop(listing);
+            if (!background.isEmpty()) loadArtwork(background, backdrop);
+        }
         Button back = tile("‹ BACK TO SERIES", Color.rgb(25, 42, 75), this::showSeriesDashboard);
         page.addView(back, new LinearLayout.LayoutParams(dp(190), dp(45)));
         ScrollView scroll = new ScrollView(this);
@@ -1839,7 +1850,7 @@ public class MainActivity extends Activity {
         content.addView(hero);
         ImageView cover = new ImageView(this);
         cover.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        hero.addView(cover, new LinearLayout.LayoutParams(dp(190), dp(280)));
+        hero.addView(cover, new LinearLayout.LayoutParams(dp(215), dp(310)));
         loadArtwork(poster, cover);
         LinearLayout info = new LinearLayout(this);
         info.setOrientation(LinearLayout.VERTICAL);
@@ -1860,6 +1871,7 @@ public class MainActivity extends Activity {
         TextView seasonLabel = text("SEASONS & EPISODES");
         seasonLabel.setTextSize(21);
         seasonLabel.setTypeface(Typeface.DEFAULT_BOLD);
+        seasonLabel.setPadding(0, dp(6), 0, dp(14));
         content.addView(seasonLabel);
         LinearLayout episodesList = new LinearLayout(this);
         episodesList.setOrientation(LinearLayout.VERTICAL);
@@ -1882,6 +1894,9 @@ public class MainActivity extends Activity {
                         if (!description.isEmpty()) plot.setText(description);
                         String image = metadata.optString("cover", "");
                         if (!image.isEmpty()) loadArtwork(image, cover);
+                        String background = movieBackdrop(metadata);
+                        if (background.isEmpty()) background = movieBackdrop(response);
+                        if (!background.isEmpty()) loadArtwork(background, backdrop);
                     }
                     episodesList.removeAllViews();
                     if (episodes == null || episodes.length() == 0) {
@@ -1900,7 +1915,7 @@ public class MainActivity extends Activity {
                         if (entries == null) continue;
                         Button seasonButton = tile("SEASON " + season + "  (" + entries.length() + " episodes)  ▾",
                             Color.rgb(25, 42, 75), () -> {});
-                        episodesList.addView(seasonButton, new LinearLayout.LayoutParams(-1, dp(52)));
+                        episodesList.addView(seasonButton, new LinearLayout.LayoutParams(-1, dp(48)));
                         LinearLayout seasonItems = new LinearLayout(this);
                         seasonItems.setOrientation(LinearLayout.VERTICAL);
                         episodesList.addView(seasonItems);
@@ -1918,7 +1933,9 @@ public class MainActivity extends Activity {
                                 Color.rgb(26, 39, 65), () -> play("series", episodeId, extension));
                             episodeButton.setTextSize(14);
                             episodeButton.setGravity(Gravity.CENTER_VERTICAL | Gravity.LEFT);
-                            seasonItems.addView(episodeButton, new LinearLayout.LayoutParams(-1, dp(58)));
+                            LinearLayout.LayoutParams episodeParams = new LinearLayout.LayoutParams(-1, dp(54));
+                            episodeParams.setMargins(dp(10), dp(3), dp(10), dp(3));
+                            seasonItems.addView(episodeButton, episodeParams);
                         }
                     }
                 });
