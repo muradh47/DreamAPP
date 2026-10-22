@@ -1385,6 +1385,109 @@ public class MainActivity extends Activity {
 
     private int moviePosterHeight(String type) { return type.equals("vod") && categorySidebar != null && categorySidebar.getParent() != null ? dp(146) : dp(105); }
 
+    private void showMovieDetails(String id, String name, String ext, String poster, JSONObject listing) {
+        releasePlayer();
+        setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
+        getWindow().getDecorView().setSystemUiVisibility(0);
+        LinearLayout page = new LinearLayout(this);
+        page.setOrientation(LinearLayout.VERTICAL);
+        page.setPadding(dp(20), dp(12), dp(20), dp(12));
+        page.setBackgroundColor(Color.rgb(9, 17, 37));
+        setContentView(page);
+        Button back = tile("‹ BACK TO MOVIES", Color.rgb(25, 42, 75), this::showMovieDashboard);
+        page.addView(back, new LinearLayout.LayoutParams(dp(180), dp(46)));
+        ScrollView scroll = new ScrollView(this);
+        page.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+        LinearLayout row = new LinearLayout(this);
+        row.setPadding(0, dp(15), 0, 0);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        scroll.addView(row);
+        ImageView cover = new ImageView(this);
+        cover.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        row.addView(cover, new LinearLayout.LayoutParams(dp(230), dp(345)));
+        loadArtwork(poster, cover);
+        LinearLayout info = new LinearLayout(this);
+        info.setOrientation(LinearLayout.VERTICAL);
+        info.setPadding(dp(24), dp(3), dp(5), dp(5));
+        row.addView(info, new LinearLayout.LayoutParams(0, -2, 1));
+        TextView heading = text(name);
+        heading.setTextSize(27);
+        heading.setTypeface(Typeface.DEFAULT_BOLD);
+        info.addView(heading);
+        TextView facts = text("Loading movie information...");
+        facts.setTextSize(15);
+        facts.setTextColor(Color.rgb(160, 195, 235));
+        facts.setPadding(0, dp(12), 0, dp(12));
+        info.addView(facts);
+        LinearLayout actions = new LinearLayout(this);
+        info.addView(actions);
+        Button playButton = tile("▶ PLAY MOVIE", Color.rgb(23, 112, 197), () -> play("vod", id, ext));
+        playButton.setTextSize(17);
+        actions.addView(playButton, new LinearLayout.LayoutParams(dp(185), dp(58)));
+        String[] trailerUrl = new String[]{""};
+        Button trailerButton = tile("▶ TRAILER", Color.rgb(28, 47, 80), () -> {
+            String link = trailerUrl[0];
+            if (link.isEmpty()) {
+                new android.app.AlertDialog.Builder(this).setMessage("No trailer is available for this movie.")
+                    .setPositiveButton("OK", null).show();
+                return;
+            }
+            try { startActivity(new android.content.Intent(android.content.Intent.ACTION_VIEW, Uri.parse(link))); }
+            catch (Exception e) {
+                new android.app.AlertDialog.Builder(this).setMessage("No app available to open the trailer.")
+                    .setPositiveButton("OK", null).show();
+            }
+        });
+        trailerButton.setTextSize(15);
+        LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(dp(155), dp(58));
+        tp.setMargins(dp(12), 0, 0, 0);
+        actions.addView(trailerButton, tp);
+        TextView description = text("Loading description...");
+        description.setTextSize(17);
+        description.setPadding(0, dp(22), 0, 0);
+        info.addView(description);
+        populateMovieDetails(listing == null ? new JSONObject() : listing, facts, description, trailerUrl);
+        new Thread(() -> {
+            try {
+                JSONObject response = new JSONObject(fetch(api(username, password, "get_vod_info") + "&vod_id=" + enc(id)));
+                JSONObject detail = response.optJSONObject("info");
+                if (detail == null) detail = response;
+                JSONObject ready = detail;
+                runOnUiThread(() -> {
+                    if (scroll.getParent() != page) return;
+                    populateMovieDetails(ready, facts, description, trailerUrl);
+                    String updatedPoster = ready.optString("movie_image", ready.optString("cover_big", ""));
+                    if (!updatedPoster.isEmpty()) loadArtwork(updatedPoster, cover);
+                });
+            } catch (Exception ignored) {
+                runOnUiThread(() -> {
+                    if (description.getText().toString().equals("No description available from your provider."))
+                        description.setText("Movie description is not available from your provider.");
+                });
+            }
+        }).start();
+        playButton.requestFocus();
+    }
+
+    private void populateMovieDetails(JSONObject movie, TextView facts, TextView description, String[] trailerUrl) {
+        String year = movie.optString("releasedate", movie.optString("releaseDate", movie.optString("year", "")));
+        String genre = movie.optString("genre", "");
+        String rating = movie.optString("rating", movie.optString("rating_5based", ""));
+        String duration = movie.optString("duration", "");
+        String meta = (year.length() >= 4 ? year.substring(0, 4) : "") +
+            (!genre.isEmpty() ? "    •    " + genre : "") +
+            (!duration.isEmpty() ? "    •    " + duration : "") +
+            (!rating.isEmpty() ? "    •    ★ " + rating : "");
+        facts.setText(meta.trim().isEmpty() ? "Movie" : meta.trim());
+        String plot = movie.optString("plot", movie.optString("description", movie.optString("overview", "")));
+        description.setText(plot.isEmpty() ? "No description available from your provider." : plot);
+        String trailer = movie.optString("youtube_trailer", movie.optString("trailer", ""));
+        if (!trailer.isEmpty()) {
+            if (trailer.matches("[A-Za-z0-9_-]{11}")) trailer = "https://www.youtube.com/watch?v=" + trailer;
+            if (trailer.startsWith("https://") || trailer.startsWith("http://")) trailerUrl[0] = trailer;
+        }
+    }
+
     private void channelCard(String name, String logo, String type, String id, String ext, JSONObject metadata) {
         if (type.equals("live")) {
             LinearLayout row = new LinearLayout(this);
@@ -1440,7 +1543,7 @@ public class MainActivity extends Activity {
         card.setOnClickListener(v -> {
             if (type.equals("live")) showChannel(id, name);
             else if (type.equals("series")) showEpisodes(id, name);
-            else play(type, id, ext);
+            else showMovieDetails(id, name, ext, logo, metadata);
         });
         card.setOnFocusChangeListener((v, focused) -> card.setBackgroundColor(
             focused ? Color.rgb(33, 107, 187) : Color.rgb(29, 36, 52)));
