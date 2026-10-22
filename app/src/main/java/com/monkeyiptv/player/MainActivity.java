@@ -964,6 +964,50 @@ public class MainActivity extends Activity {
 
     private Button loadMoreButton;
 
+    private final java.util.concurrent.ExecutorService cardEpgPool =
+        java.util.concurrent.Executors.newFixedThreadPool(3);
+    private final java.util.Map<String, String> cardEpgCache =
+        new java.util.concurrent.ConcurrentHashMap<>();
+
+    private void loadLiveCardEpg(String streamId, TextView target) {
+        String cached = cardEpgCache.get(streamId);
+        if (cached != null) {
+            target.setText(cached);
+            return;
+        }
+        cardEpgPool.execute(() -> {
+            String label = "NOW  •  Programme unavailable";
+            try {
+                JSONObject response = new JSONObject(fetch(api(username, password, "get_short_epg")
+                    + "&stream_id=" + enc(streamId) + "&limit=5"));
+                JSONArray listings = response.optJSONArray("epg_listings");
+                long now = System.currentTimeMillis();
+                if (listings != null) for (int i = 0; i < listings.length(); i++) {
+                    JSONObject entry = listings.optJSONObject(i);
+                    if (entry == null) continue;
+                    long start = epgTime(entry.optString("start_timestamp"), entry.optString("start"));
+                    long end = epgTime(entry.optString("stop_timestamp"), entry.optString("end"));
+                    if (start <= now && end > now) {
+                        String programme = decodeEpg(entry.optString("title", "")).trim();
+                        if (!programme.isEmpty()) {
+                            java.text.SimpleDateFormat timeFormat =
+                                new java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault());
+                            label = "NOW  •  " + programme + "  (" +
+                                timeFormat.format(new java.util.Date(start)) + "–" +
+                                timeFormat.format(new java.util.Date(end)) + ")";
+                        }
+                        break;
+                    }
+                }
+            } catch (Exception ignored) { }
+            final String result = label;
+            cardEpgCache.put(streamId, result);
+            runOnUiThread(() -> {
+                if (target.getParent() != null) target.setText(result);
+            });
+        });
+    }
+
     private void channelCard(String name, String logo, String type, String id, String ext, JSONObject metadata) {
         if (type.equals("live")) {
             LinearLayout row = new LinearLayout(this);
@@ -984,17 +1028,29 @@ public class MainActivity extends Activity {
             logoView.setImageResource(android.R.drawable.ic_media_play);
             row.addView(logoView, new LinearLayout.LayoutParams(dp(58), dp(52)));
             loadArtwork(logo, logoView);
+            LinearLayout details = new LinearLayout(this);
+            details.setOrientation(LinearLayout.VERTICAL);
+            details.setGravity(Gravity.CENTER_VERTICAL);
+            details.setPadding(dp(10), dp(4), dp(4), dp(4));
             TextView titleView = text(name);
-            titleView.setTextSize(17);
-            titleView.setMaxLines(2);
+            titleView.setTextSize(16);
+            titleView.setMaxLines(1);
             titleView.setEllipsize(android.text.TextUtils.TruncateAt.END);
-            titleView.setGravity(Gravity.CENTER_VERTICAL);
-            titleView.setPadding(dp(12), 0, 0, 0);
-            row.addView(titleView, new LinearLayout.LayoutParams(0, -1, 1f));
+            titleView.setPadding(0, 0, 0, 0);
+            details.addView(titleView);
+            TextView nowView = text("NOW  •  Loading guide...");
+            nowView.setTextSize(12);
+            nowView.setTextColor(Color.rgb(159, 208, 245));
+            nowView.setMaxLines(2);
+            nowView.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            nowView.setPadding(0, dp(5), 0, 0);
+            details.addView(nowView);
+            row.addView(details, new LinearLayout.LayoutParams(0, -1, 1f));
+            loadLiveCardEpg(id, nowView);
             GridLayout.LayoutParams rowParams = new GridLayout.LayoutParams();
             int available = getResources().getDisplayMetrics().widthPixels - dp(36);
             rowParams.width = Math.max(dp(140), available / 2 - dp(10));
-            rowParams.height = dp(68);
+            rowParams.height = dp(96);
             rowParams.setMargins(dp(5), dp(5), dp(5), dp(5));
             contentGrid.addView(row, rowParams);
             if (contentGrid.getChildCount() == 1) row.requestFocus();
