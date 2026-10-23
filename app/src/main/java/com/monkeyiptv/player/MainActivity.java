@@ -2081,40 +2081,94 @@ public class MainActivity extends Activity {
     private void showCategories(String type) {
         currentType = type;
         ++browseRequest;
-        screen(type.equals("live") ? "LIVE TV  •  CATEGORIES" :
-            type.equals("vod") ? "MOVIES  •  CATEGORIES" : "SERIES  •  CATEGORIES");
-        Button home = tile("‹  HOME", DREAM_PANEL, this::showHome);
-        home.setTextSize(14);
-        root.addView(home, new LinearLayout.LayoutParams(dp(116), dp(44)));
-        TextView hint = text(type.equals("live") ? "Choose a channel group to start watching" : "Choose a category");
-        hint.setTextSize(15);
-        root.addView(hint);
+        boolean live = "live".equals(type);
+        String section = live ? "Live TV" : "vod".equals(type) ? "Movies" : "Series";
+        int width = getResources().getDisplayMetrics().widthPixels;
+        LinearLayout page = new LinearLayout(this);
+        page.setOrientation(LinearLayout.VERTICAL);
+        page.setBackgroundColor(DREAM_BG);
+        page.setFitsSystemWindows(true);
+        setContentView(page);
+
+        LinearLayout header = new LinearLayout(this);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        header.setPadding(dp(24), dp(9), dp(24), dp(9));
+        page.addView(header, new LinearLayout.LayoutParams(-1, dp(68)));
+        Button back = tile("‹  HOME", DREAM_PANEL, this::showHome);
+        back.setTextSize(13);
+        header.addView(back, new LinearLayout.LayoutParams(dp(112), dp(43)));
+        TextView brand = text("DREAM   /   " + section.toUpperCase(java.util.Locale.UK));
+        brand.setTextSize(19);
+        brand.setTypeface(Typeface.DEFAULT_BOLD);
+        LinearLayout.LayoutParams brandParams = new LinearLayout.LayoutParams(0, -2, 1);
+        brandParams.leftMargin = dp(15);
+        header.addView(brand, brandParams);
+
+        ScrollView scroll = new ScrollView(this);
+        scroll.setFillViewport(true);
+        scroll.setClipToPadding(false);
+        page.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setPadding(dp(24), dp(12), dp(24), dp(30));
+        scroll.addView(content);
+
+        TextView eyebrow = text("YOUR COLLECTION");
+        eyebrow.setTextSize(12);
+        eyebrow.setLetterSpacing(0.17f);
+        eyebrow.setTypeface(Typeface.DEFAULT_BOLD);
+        eyebrow.setTextColor(Color.rgb(86, 172, 255));
+        eyebrow.setPadding(dp(5), dp(6), dp(5), dp(2));
+        content.addView(eyebrow);
+
+        TextView heading = text(live ? "What are we watching?" : "Explore " + section);
+        heading.setTextSize(29);
+        heading.setTypeface(Typeface.DEFAULT_BOLD);
+        heading.setPadding(dp(5), dp(2), dp(5), dp(3));
+        content.addView(heading);
+
+        TextView subtitle = text(live ? "Pick a collection to see its channels" : "Choose a collection to browse");
+        subtitle.setTextSize(14);
+        subtitle.setTextColor(Color.rgb(151, 172, 198));
+        subtitle.setPadding(dp(5), 0, dp(5), dp(16));
+        content.addView(subtitle);
+
+        TextView groupHeading = text("ALL COLLECTIONS");
+        groupHeading.setTextSize(13);
+        groupHeading.setTypeface(Typeface.DEFAULT_BOLD);
+        groupHeading.setLetterSpacing(0.09f);
+        groupHeading.setTextColor(Color.rgb(167, 190, 217));
+        groupHeading.setPadding(dp(5), dp(8), dp(5), dp(8));
+        content.addView(groupHeading);
+
         GridLayout categoriesGrid = new GridLayout(this);
-        categoriesGrid.setColumnCount(getResources().getDisplayMetrics().widthPixels >= dp(760) ? 4 : 2);
+        categoriesGrid.setColumnCount(width >= dp(1000) ? 4 : width >= dp(650) ? 3 : 2);
         categoriesGrid.setUseDefaultMargins(false);
-        root.addView(categoriesGrid, new LinearLayout.LayoutParams(-1, -2));
+        content.addView(categoriesGrid, new LinearLayout.LayoutParams(-1, -2));
+
         JSONArray cached = categoryCache.get(type);
         if (cached != null) {
             renderCategoryTiles(type, cached, categoriesGrid);
             return;
         }
-        TextView loading = text("Loading categories...");
-        root.addView(loading);
+        TextView loading = text("Loading your collections…");
+        loading.setTextColor(Color.rgb(153, 175, 203));
+        content.addView(loading);
         new Thread(() -> {
             try {
-                String action = type.equals("live") ? "get_live_categories" :
-                    type.equals("vod") ? "get_vod_categories" : "get_series_categories";
+                String action = live ? "get_live_categories" :
+                    "vod".equals(type) ? "get_vod_categories" : "get_series_categories";
                 JSONArray categories = new JSONArray(fetch(api(username, password, action)));
                 categoryCache.put(type, categories);
                 runOnUiThread(() -> {
                     if (!type.equals(currentType) || categoriesGrid.getParent() == null) return;
-                    root.removeView(loading);
+                    content.removeView(loading);
                     renderCategoryTiles(type, categories, categoriesGrid);
                 });
             } catch (Exception ex) {
                 runOnUiThread(() -> {
                     if (categoriesGrid.getParent() == null) return;
-                    loading.setText("Categories unavailable. Tap to retry.");
+                    loading.setText("Couldn't load collections. Tap to retry.");
                     loading.setOnClickListener(v -> showCategories(type));
                 });
             }
@@ -2123,36 +2177,71 @@ public class MainActivity extends Activity {
 
     private void renderCategoryTiles(String type, JSONArray categories, GridLayout grid) {
         grid.removeAllViews();
-        addCategoryTile(grid, "▣  ALL " + (type.equals("live") ? "CHANNELS" :
-            type.equals("vod") ? "MOVIES" : "SERIES"), () -> openCategory(type, ""));
+        addCategoryTile(grid, "All " + ("live".equals(type) ? "channels" :
+            "vod".equals(type) ? "movies" : "series"), true, () -> openCategory(type, ""));
         for (int i = 0; i < categories.length(); i++) {
             JSONObject category = categories.optJSONObject(i);
             if (category == null) continue;
             String id = category.optString("category_id");
             String name = category.optString("category_name", "Other");
-            addCategoryTile(grid, "▣  " + name, () -> openCategory(type, id));
+            addCategoryTile(grid, name, false, () -> openCategory(type, id));
         }
     }
 
-    private void addCategoryTile(GridLayout grid, String name, Runnable action) {
-        Button item = tile(name, Color.rgb(27, 43, 74), action);
-        item.setTextSize(15);
-        item.setGravity(Gravity.CENTER_VERTICAL | Gravity.LEFT);
-        item.setPadding(dp(16), dp(5), dp(8), dp(5));
-        item.setSingleLine(true);
-        item.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        item.setOnFocusChangeListener((v, focused) -> {
-            item.setBackground(dreamTileBackground(Color.rgb(27, 43, 74), focused));
-            item.setScaleX(focused ? 1.02f : 1f);
-            item.setScaleY(focused ? 1.02f : 1f);
-        });
+    private void addCategoryTile(GridLayout grid, String name, boolean featured, Runnable action) {
+        int columns = grid.getColumnCount();
         int width = getResources().getDisplayMetrics().widthPixels - dp(48);
+        int cellWidth = Math.max(dp(145), width / columns - dp(12));
+        LinearLayout panel = new LinearLayout(this);
+        panel.setOrientation(LinearLayout.VERTICAL);
+        panel.setGravity(Gravity.CENTER_VERTICAL);
+        panel.setPadding(dp(18), dp(12), dp(14), dp(12));
+        int base = featured ? Color.rgb(21, 89, 166) : Color.rgb(22, 38, 64);
+        panel.setBackground(dreamTileBackground(base, false));
+        panel.setFocusable(true);
+        panel.setClickable(true);
+        panel.setOnClickListener(v -> action.run());
+        panel.setOnFocusChangeListener((v, focused) -> {
+            panel.setBackground(dreamTileBackground(base, focused));
+            panel.setScaleX(focused ? 1.025f : 1f);
+            panel.setScaleY(focused ? 1.025f : 1f);
+            panel.setElevation(dp(focused ? 9 : 1));
+        });
+        TextView icon = text(featured ? "▣" : categorySymbol(name));
+        icon.setTextSize(23);
+        icon.setTextColor(featured ? Color.WHITE : Color.rgb(104, 183, 255));
+        icon.setPadding(0, 0, 0, dp(8));
+        panel.addView(icon);
+        String display = name.replaceFirst("(?i)^UK\\\\s*[|:]\\\\s*", "");
+        TextView title = text(display);
+        title.setTextSize(16);
+        title.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
+        title.setMaxLines(2);
+        title.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        title.setPadding(0, 0, 0, 0);
+        panel.addView(title);
+        TextView hint = text("VIEW CHANNELS   ›");
+        hint.setTextSize(10);
+        hint.setLetterSpacing(0.08f);
+        hint.setTextColor(Color.rgb(151, 178, 208));
+        hint.setPadding(0, dp(8), 0, 0);
+        panel.addView(hint);
         GridLayout.LayoutParams params = new GridLayout.LayoutParams();
-        int columns = getResources().getDisplayMetrics().widthPixels >= dp(760) ? 4 : 2;
-        params.width = Math.max(dp(130), width / columns - dp(12));
-        params.height = dp(72);
-        params.setMargins(dp(4), dp(4), dp(4), dp(4));
-        grid.addView(item, params);
+        params.width = cellWidth;
+        params.height = dp(133);
+        params.setMargins(dp(5), dp(5), dp(5), dp(5));
+        grid.addView(panel, params);
+    }
+
+    private String categorySymbol(String name) {
+        String n = name.toLowerCase(java.util.Locale.UK);
+        if (n.contains("sport") || n.contains("epl") || n.contains("football")) return "⚽";
+        if (n.contains("movie") || n.contains("cinema")) return "▶";
+        if (n.contains("kids") || n.contains("cartoon")) return "★";
+        if (n.contains("music") || n.contains("radio")) return "♫";
+        if (n.contains("news")) return "◉";
+        if (n.contains("documentary") || n.contains("discovery")) return "◎";
+        return "▤";
     }
 
     private void openCategory(String type, String categoryId) {
