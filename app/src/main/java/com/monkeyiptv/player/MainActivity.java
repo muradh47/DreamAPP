@@ -438,11 +438,115 @@ public class MainActivity extends Activity {
         parent.addView(panel, params);
     }
 
+    private final java.util.ArrayList<JSONObject> footballGuideEntries = new java.util.ArrayList<>();
+    private final java.util.ArrayList<JSONObject> footballFixtures = new java.util.ArrayList<>();
+    private LinearLayout footballFixtureContainer;
+
+    private String footballNormalise(String name) {
+        return name.toLowerCase(java.util.Locale.UK)
+            .replaceAll("\\b(fc|afc|cf|football club|united|city)\\b", " ")
+            .replaceAll("[^a-z0-9 ]", " ").replaceAll("\\s+", " ").trim();
+    }
+
+    private boolean footballTeamFound(String title, String team) {
+        String clean = footballNormalise(team);
+        if (clean.length() < 4) return false;
+        String normalTitle = footballNormalise(title);
+        if (normalTitle.contains(clean)) return true;
+        String[] parts = clean.split(" ");
+        return parts.length > 1 && parts[0].length() >= 5 && normalTitle.contains(parts[0]);
+    }
+
+    private void footballRenderFixtures(int request) {
+        if (request != footballRequest || footballFixtureContainer == null) return;
+        LinearLayout target = footballFixtureContainer;
+        target.removeAllViews();
+        TextView heading = text("UK FOOTBALL FIXTURES");
+        heading.setTypeface(Typeface.DEFAULT_BOLD);
+        heading.setTextSize(18);
+        heading.setPadding(0, dp(4), 0, dp(9));
+        target.addView(heading);
+        if (footballFixtures.isEmpty()) {
+            TextView empty = text("Fixture API unavailable or no upcoming fixtures. UK channels appear below.");
+            empty.setTextColor(Color.rgb(155, 177, 201));
+            target.addView(empty);
+            return;
+        }
+        int count = Math.min(footballFixtures.size(), 12);
+        for (int i = 0; i < count; i++) {
+            JSONObject fixture = footballFixtures.get(i);
+            String home = fixture.optString("strHomeTeam", "Home");
+            String away = fixture.optString("strAwayTeam", "Away");
+            String date = fixture.optString("dateEvent", "");
+            String utc = fixture.optString("strTime", "00:00:00");
+            long kickoffMs = 0;
+            String local = date;
+            try {
+                java.text.SimpleDateFormat parser = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.UK);
+                parser.setTimeZone(java.util.TimeZone.getTimeZone("UTC"));
+                java.util.Date kickoff = parser.parse(date + " " + utc);
+                java.text.SimpleDateFormat uk = new java.text.SimpleDateFormat("EEE d MMM, HH:mm", java.util.Locale.UK);
+                uk.setTimeZone(java.util.TimeZone.getTimeZone("Europe/London"));
+                if (kickoff != null) { local = uk.format(kickoff); kickoffMs = kickoff.getTime(); }
+            } catch (Exception ignored) {}
+            JSONObject best = null;
+            synchronized (footballGuideEntries) {
+                for (JSONObject entry : footballGuideEntries) {
+                    String programme = entry.optString("programme");
+                    if (!footballTeamFound(programme, home) || !footballTeamFound(programme, away)) continue;
+                    long epgStart = entry.optLong("startMs");
+                    if (kickoffMs > 0 && epgStart > 0 && Math.abs(kickoffMs - epgStart) > 3L * 3600000L) continue;
+                    best = entry;
+                    break;
+                }
+            }
+            LinearLayout card = new LinearLayout(this);
+            card.setOrientation(LinearLayout.VERTICAL);
+            card.setPadding(dp(15), dp(11), dp(15), dp(11));
+            GradientDrawable bg = new GradientDrawable();
+            bg.setColor(Color.rgb(23, 36, 58));
+            bg.setCornerRadius(dp(10));
+            card.setBackground(bg);
+            LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(-1, -2);
+            cp.setMargins(0, 0, 0, dp(6));
+            target.addView(card, cp);
+            TextView teams = text(home + "  vs  " + away);
+            teams.setTextSize(16);
+            teams.setTypeface(Typeface.DEFAULT_BOLD);
+            card.addView(teams);
+            TextView detail = text(fixture.optString("dream_league") + "  •  " + local + " UK");
+            detail.setTextSize(12);
+            detail.setTextColor(Color.rgb(153, 190, 228));
+            card.addView(detail);
+            if (best != null) {
+                String channelId = best.optString("id");
+                String channelName = best.optString("channel");
+                TextView watch = text("▶  WATCH ON " + channelName);
+                watch.setTextSize(13);
+                watch.setTextColor(Color.rgb(125, 209, 255));
+                watch.setPadding(0, dp(7), 0, 0);
+                card.addView(watch);
+                card.setFocusable(true);
+                card.setClickable(true);
+                card.setOnClickListener(v -> play("live", channelId, "ts"));
+                card.setOnFocusChangeListener((v, focus) ->
+                    card.setBackgroundColor(focus ? Color.rgb(28, 105, 189) : Color.rgb(23, 36, 58)));
+            } else {
+                TextView missing = text("Channel not confirmed in your EPG");
+                missing.setTextSize(12);
+                missing.setTextColor(Color.rgb(142, 162, 186));
+                card.addView(missing);
+            }
+        }
+    }
+
     private int footballRequest = 0;
 
     private void showFootball() {
         releasePlayer();
         final int request = ++footballRequest;
+        synchronized (footballGuideEntries) { footballGuideEntries.clear(); }
+        footballFixtures.clear();
         LinearLayout page = new LinearLayout(this);
         page.setOrientation(LinearLayout.VERTICAL);
         page.setFitsSystemWindows(true);
@@ -474,6 +578,7 @@ public class MainActivity extends Activity {
         fixtureStatus.setTextSize(14);
         fixtureStatus.setTextColor(Color.rgb(159, 185, 212));
         fixtures.addView(fixtureStatus);
+        footballFixtureContainer = fixtures;
         new Thread(() -> loadUkFootballFixtures(request, fixtures)).start();
         ScrollView scroller = new ScrollView(this);
         page.addView(scroller, new LinearLayout.LayoutParams(-1, 0, 1));
@@ -526,6 +631,15 @@ public class MainActivity extends Activity {
                             long end = epgTime(entry.optString("stop_timestamp"), entry.optString("end"));
                             if (end < now || start > now + 24L * 3600000L) continue;
                             String candidate = shortEpgLabel(entry);
+                            String titleForMatch = candidate + " " + decodeEpg(entry.optString("description", ""));
+                            JSONObject indexed = new JSONObject();
+                            indexed.put("id", id);
+                            indexed.put("channel", name);
+                            indexed.put("programme", titleForMatch);
+                            indexed.put("startMs", start);
+                            synchronized (footballGuideEntries) { footballGuideEntries.add(indexed); }
+                            if (footballGuideEntries.size() % 8 == 0)
+                                runOnUiThread(() -> footballRenderFixtures(request));
                             String lower = candidate.toLowerCase(java.util.Locale.ROOT);
                             if (lower.contains("football") || lower.contains("soccer") ||
                                 lower.contains("premier league") || lower.contains("champions league") ||
@@ -609,61 +723,9 @@ public class MainActivity extends Activity {
                 b.optString("dateEvent") + b.optString("strTime")));
         runOnUiThread(() -> {
             if (request != footballRequest) return;
-            target.removeAllViews();
-            TextView heading = text("UPCOMING UK FOOTBALL");
-            heading.setTypeface(Typeface.DEFAULT_BOLD);
-            heading.setTextSize(18);
-            heading.setPadding(0, dp(4), 0, dp(9));
-            target.addView(heading);
-            if (events.isEmpty()) {
-                TextView unavailable = text("Fixtures could not be retrieved. Try refresh; UK sports channels appear below.");
-                unavailable.setTextColor(Color.rgb(155, 177, 201));
-                unavailable.setTextSize(13);
-                target.addView(unavailable);
-                return;
-            }
-            int count = Math.min(events.size(), 7);
-            for (int i = 0; i < count; i++) {
-                JSONObject event = events.get(i);
-                String home = event.optString("strHomeTeam", "Home");
-                String away = event.optString("strAwayTeam", "Away");
-                String date = event.optString("dateEvent", "");
-                String utc = event.optString("strTime", "00:00:00");
-                String local = date;
-                try {
-                    java.text.SimpleDateFormat parser = new java.text.SimpleDateFormat(
-                        "yyyy-MM-dd HH:mm:ss", java.util.Locale.UK);
-                    parser.setTimeZone(java.util.TimeZone.getTimeZone("UTC"));
-                    java.util.Date kickoff = parser.parse(date + " " + utc);
-                    java.text.SimpleDateFormat uk = new java.text.SimpleDateFormat(
-                        "EEE d MMM, HH:mm", java.util.Locale.UK);
-                    uk.setTimeZone(java.util.TimeZone.getTimeZone("Europe/London"));
-                    if (kickoff != null) local = uk.format(kickoff);
-                } catch (Exception ignored) {}
-                LinearLayout card = new LinearLayout(this);
-                card.setOrientation(LinearLayout.VERTICAL);
-                card.setPadding(dp(15), dp(10), dp(15), dp(10));
-                GradientDrawable bg = new GradientDrawable();
-                bg.setColor(Color.rgb(23, 36, 58));
-                bg.setCornerRadius(dp(10));
-                card.setBackground(bg);
-                LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(-1, -2);
-                cp.setMargins(0, 0, 0, dp(5));
-                target.addView(card, cp);
-                TextView teams = text(home + "  vs  " + away);
-                teams.setTextSize(16);
-                teams.setTypeface(Typeface.DEFAULT_BOLD);
-                card.addView(teams);
-                TextView detail = text(event.optString("dream_league") + "  •  " + local + " UK");
-                detail.setTextSize(12);
-                detail.setTextColor(Color.rgb(153, 190, 228));
-                card.addView(detail);
-            }
-            TextView notice = text("Fixtures: TheSportsDB  •  Channels below: your IPTV provider EPG");
-            notice.setTextSize(11);
-            notice.setTextColor(Color.rgb(129, 153, 182));
-            notice.setPadding(0, dp(5), 0, dp(5));
-            target.addView(notice);
+            footballFixtures.clear();
+            footballFixtures.addAll(events);
+            footballRenderFixtures(request);
         });
     }
 
