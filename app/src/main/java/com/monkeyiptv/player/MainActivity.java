@@ -466,6 +466,15 @@ public class MainActivity extends Activity {
         subtitle.setTextColor(Color.rgb(159, 180, 206));
         subtitle.setPadding(dp(24), dp(4), dp(16), dp(12));
         page.addView(subtitle);
+        LinearLayout fixtures = new LinearLayout(this);
+        fixtures.setOrientation(LinearLayout.VERTICAL);
+        fixtures.setPadding(dp(24), dp(6), dp(24), dp(8));
+        page.addView(fixtures);
+        TextView fixtureStatus = text("Loading UK football fixtures…");
+        fixtureStatus.setTextSize(14);
+        fixtureStatus.setTextColor(Color.rgb(159, 185, 212));
+        fixtures.addView(fixtureStatus);
+        new Thread(() -> loadUkFootballFixtures(request, fixtures)).start();
         ScrollView scroller = new ScrollView(this);
         page.addView(scroller, new LinearLayout.LayoutParams(-1, 0, 1));
         LinearLayout matches = new LinearLayout(this);
@@ -575,6 +584,87 @@ public class MainActivity extends Activity {
                 });
             }
         }).start();
+    }
+
+    private void loadUkFootballFixtures(int request, LinearLayout target) {
+        java.util.ArrayList<JSONObject> events = new java.util.ArrayList<>();
+        String[][] leagues = {{"4328", "Premier League"}, {"4329", "Championship"}};
+        for (String[] league : leagues) {
+            try {
+                String endpoint = "https://www.thesportsdb.com/api/v1/json/3/eventsnextleague.php?id=" + league[0];
+                JSONObject response = new JSONObject(fetchAbsolute(endpoint));
+                JSONArray data = response.optJSONArray("events");
+                if (data == null) continue;
+                for (int i = 0; i < data.length(); i++) {
+                    JSONObject event = data.optJSONObject(i);
+                    if (event != null) {
+                        event.put("dream_league", league[1]);
+                        events.add(event);
+                    }
+                }
+            } catch (Exception ignored) {}
+        }
+        java.util.Collections.sort(events, (a, b) ->
+            (a.optString("dateEvent") + a.optString("strTime")).compareTo(
+                b.optString("dateEvent") + b.optString("strTime")));
+        runOnUiThread(() -> {
+            if (request != footballRequest) return;
+            target.removeAllViews();
+            TextView heading = text("UPCOMING UK FOOTBALL");
+            heading.setTypeface(Typeface.DEFAULT_BOLD);
+            heading.setTextSize(18);
+            heading.setPadding(0, dp(4), 0, dp(9));
+            target.addView(heading);
+            if (events.isEmpty()) {
+                TextView unavailable = text("Fixture feed unavailable. Your IPTV football channels are below.");
+                unavailable.setTextColor(Color.rgb(155, 177, 201));
+                unavailable.setTextSize(13);
+                target.addView(unavailable);
+                return;
+            }
+            int count = Math.min(events.size(), 7);
+            for (int i = 0; i < count; i++) {
+                JSONObject event = events.get(i);
+                String home = event.optString("strHomeTeam", "Home");
+                String away = event.optString("strAwayTeam", "Away");
+                String date = event.optString("dateEvent", "");
+                String utc = event.optString("strTime", "00:00:00");
+                String local = date;
+                try {
+                    java.text.SimpleDateFormat parser = new java.text.SimpleDateFormat(
+                        "yyyy-MM-dd HH:mm:ss", java.util.Locale.UK);
+                    parser.setTimeZone(java.util.TimeZone.getTimeZone("UTC"));
+                    java.util.Date kickoff = parser.parse(date + " " + utc);
+                    java.text.SimpleDateFormat uk = new java.text.SimpleDateFormat(
+                        "EEE d MMM, HH:mm", java.util.Locale.UK);
+                    uk.setTimeZone(java.util.TimeZone.getTimeZone("Europe/London"));
+                    if (kickoff != null) local = uk.format(kickoff);
+                } catch (Exception ignored) {}
+                LinearLayout card = new LinearLayout(this);
+                card.setOrientation(LinearLayout.VERTICAL);
+                card.setPadding(dp(15), dp(10), dp(15), dp(10));
+                GradientDrawable bg = new GradientDrawable();
+                bg.setColor(Color.rgb(23, 36, 58));
+                bg.setCornerRadius(dp(10));
+                card.setBackground(bg);
+                LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(-1, -2);
+                cp.setMargins(0, 0, 0, dp(5));
+                target.addView(card, cp);
+                TextView teams = text(home + "  vs  " + away);
+                teams.setTextSize(16);
+                teams.setTypeface(Typeface.DEFAULT_BOLD);
+                card.addView(teams);
+                TextView detail = text(event.optString("dream_league") + "  •  " + local + " UK");
+                detail.setTextSize(12);
+                detail.setTextColor(Color.rgb(153, 190, 228));
+                card.addView(detail);
+            }
+            TextView notice = text("Fixtures: TheSportsDB  •  Channels below: your IPTV provider EPG");
+            notice.setTextSize(11);
+            notice.setTextColor(Color.rgb(129, 153, 182));
+            notice.setPadding(0, dp(5), 0, dp(5));
+            target.addView(notice);
+        });
     }
 
     private LinearLayout dreamHomeShelf(LinearLayout parent, String title, Runnable action) {
