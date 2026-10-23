@@ -540,6 +540,28 @@ public class MainActivity extends Activity {
         }
     }
 
+    private boolean isUkFootballChannel(String rawName) {
+        String name = rawName.toLowerCase(java.util.Locale.UK);
+        if (name.matches(".*\\b(usa|us:|canada|ca:|australia|au:)\\b.*")) return false;
+        String[] clubs = {"arsenal", "chelsea", "liverpool", "manchester united", "man utd",
+            "man city", "tottenham", "spurs", "newcastle", "aston villa", "west ham",
+            "everton", "leeds", "sunderland", "celtic", "rangers", "hearts",
+            "hibernian", "aberdeen", "leicester", "wolves", "brighton",
+            "nottingham forest", "forest tv", "fulham", "brentford", "burnley",
+            "southampton", "ipswich", "norwich", "derby", "sheffield",
+            "middlesbrough", "boro tv", "stoke", "blackburn", "birmingham",
+            "coventry", "wrexham", "cardiff", "swansea", "portsmouth", "watford"};
+        for (String club : clubs) if (name.contains(club)) return true;
+        boolean uk = name.contains("uk:") || name.contains("uk ") || name.contains("gb:") ||
+            name.contains("gb ") || name.contains("sky sports") || name.contains("tnt sports") ||
+            name.contains("bt sport") || name.contains("premier sports") ||
+            name.contains("bbc one") || name.contains("bbc two") || name.contains("itv");
+        boolean sport = name.contains("sport") || name.contains("football") ||
+            name.contains("soccer") || name.contains("premier") || name.contains("tnt") ||
+            name.contains("fa cup") || name.contains("champions league");
+        return uk && sport;
+    }
+
     private int footballRequest = 0;
 
     private void showFootball() {
@@ -596,10 +618,7 @@ public class MainActivity extends Activity {
                     JSONObject channel = channels.optJSONObject(i);
                     if (channel == null) continue;
                     String name = channel.optString("name", "").toLowerCase(java.util.Locale.ROOT);
-                    if ((name.startsWith("uk:") || name.startsWith("uk ") || name.startsWith("gb:") || name.startsWith("gb ") || name.startsWith("sky sports") || name.startsWith("tnt sports") || name.startsWith("bt sport") || name.startsWith("premier sports")) && (name.contains("sport") || name.contains("football") ||
-                        name.contains("soccer") || name.contains("premier") ||
-                        name.contains("tnt") || name.contains("bein") ||
-                        name.contains("dazn") || name.contains("espn")))
+                    if (isUkFootballChannel(name))
                         sports.add(channel);
                 }
                 runOnUiThread(() -> {
