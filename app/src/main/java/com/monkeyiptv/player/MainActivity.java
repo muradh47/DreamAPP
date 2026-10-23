@@ -1686,7 +1686,7 @@ public class MainActivity extends Activity {
                 categoryCache.put("live", cats);
                 runOnUiThread(() -> {
                     if (liveDashboardCategories != null && liveDashboardCategories.getParent() != null
-                        && "live".equals(currentType)) { populateLiveDashboardCategories(cats); selectLiveDashboardDefault(cats); }
+                        && "live".equals(currentType)) { populateLiveDashboardCategories(cats); if (liveDashboardCategoryId == null || liveDashboardCategoryId.isEmpty()) selectLiveDashboardDefault(cats); }
                 });
             } catch (Exception ignored) { }
         }).start();
@@ -2083,8 +2083,9 @@ public class MainActivity extends Activity {
         ++browseRequest;
         screen(type.equals("live") ? "LIVE TV  •  CATEGORIES" :
             type.equals("vod") ? "MOVIES  •  CATEGORIES" : "SERIES  •  CATEGORIES");
-        Button home = button("‹  HOME", this::showHome);
+        Button home = tile("‹  HOME", DREAM_PANEL, this::showHome);
         home.setTextSize(14);
+        root.addView(home, new LinearLayout.LayoutParams(dp(116), dp(44)));
         TextView hint = text(type.equals("live") ? "Choose a channel group to start watching" : "Choose a category");
         hint.setTextSize(15);
         root.addView(hint);
