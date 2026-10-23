@@ -375,17 +375,17 @@ public class MainActivity extends Activity {
         center.setGravity(Gravity.CENTER);
         center.setPadding(dp(22), dp(10), dp(22), dp(16));
         page.addView(center, new LinearLayout.LayoutParams(-1, 0, 1));
-        TextView heading = text("What would you like to watch?");
+        TextView heading = text("Your TV. Your way.");
         heading.setTextSize(24);
         heading.setTypeface(Typeface.DEFAULT_BOLD);
         heading.setGravity(Gravity.CENTER);
         center.addView(heading);
-        TextView subtitle = text("Your entertainment, simply.");
+        TextView subtitle = text("Live channels, films and series in one place.");
         subtitle.setTextSize(14);
         subtitle.setTextColor(Color.rgb(150, 169, 192));
         subtitle.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams subtitleParams = new LinearLayout.LayoutParams(-1, -2);
-        subtitleParams.setMargins(0, dp(7), 0, dp(25));
+        subtitleParams.setMargins(0, dp(4), 0, dp(18));
         center.addView(subtitle, subtitleParams);
         LinearLayout tiles = new LinearLayout(this);
         tiles.setOrientation(getResources().getDisplayMetrics().widthPixels < dp(630)
@@ -460,7 +460,7 @@ public class MainActivity extends Activity {
         caption.setGravity(Gravity.CENTER);
         panel.addView(caption);
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-            stacked ? -1 : 0, dp(stacked ? 130 : 220), stacked ? 0 : 1);
+            stacked ? -1 : 0, dp(stacked ? 130 : 192), stacked ? 0 : 1);
         params.setMargins(dp(8), dp(7), dp(8), dp(7));
         parent.addView(panel, params);
     }
@@ -1615,7 +1615,7 @@ public class MainActivity extends Activity {
         body.setOrientation(LinearLayout.HORIZONTAL);
         page.addView(body, new LinearLayout.LayoutParams(-1, 0, 1));
         int screenWidth = getResources().getDisplayMetrics().widthPixels;
-        int sidebarWidth = Math.min(dp(235), Math.max(dp(145), screenWidth / 4));
+        int sidebarWidth = Math.min(dp(205), Math.max(dp(145), screenWidth / 5));
         ScrollView categoryScroll = new ScrollView(this);
         categoryScroll.setBackgroundColor(Color.rgb(14, 28, 57));
         body.addView(categoryScroll, new LinearLayout.LayoutParams(sidebarWidth, -1));
@@ -1630,7 +1630,7 @@ public class MainActivity extends Activity {
 
         LinearLayout previewRow = new LinearLayout(this);
         previewRow.setOrientation(LinearLayout.HORIZONTAL);
-        main.addView(previewRow, new LinearLayout.LayoutParams(-1, dp(220)));
+        main.addView(previewRow, new LinearLayout.LayoutParams(-1, dp(195)));
         android.widget.FrameLayout previewFrame = new android.widget.FrameLayout(this);
         previewRow.addView(previewFrame, new LinearLayout.LayoutParams(0, -1, 3));
         liveDashboardPreview = new PlayerView(this);
@@ -1669,7 +1669,7 @@ public class MainActivity extends Activity {
         ScrollView channelScroll = new ScrollView(this);
         main.addView(channelScroll, new LinearLayout.LayoutParams(-1, 0, 1));
         liveDashboardChannels = new GridLayout(this);
-        liveDashboardChannels.setColumnCount(3);
+        liveDashboardChannels.setColumnCount(screenWidth >= dp(850) ? 4 : 3);
         liveDashboardChannels.setPadding(dp(2), dp(2), dp(2), dp(8));
         channelScroll.addView(liveDashboardChannels);
         populateLiveDashboardCategories(categoryCache.get("live"));
@@ -1684,6 +1684,11 @@ public class MainActivity extends Activity {
                 });
             } catch (Exception ignored) { }
         }).start();
+    }
+
+    private int sidebarWidthForLive() {
+        int width = getResources().getDisplayMetrics().widthPixels;
+        return Math.min(dp(205), Math.max(dp(145), width / 5));
     }
 
     private void populateLiveDashboardCategories(JSONArray categories) {
@@ -1735,7 +1740,7 @@ public class MainActivity extends Activity {
                 runOnUiThread(() -> {
                     if (request != liveDashboardRequest || liveDashboardChannels.getParent() == null) return;
                     liveDashboardChannels.removeAllViews();
-                    int count = Math.min(channels.length(), 120);
+                    int count = Math.min(channels.length(), 240);
                     for (int i = 0; i < count; i++) {
                         JSONObject item = channels.optJSONObject(i);
                         if (item == null) continue;
@@ -1745,8 +1750,8 @@ public class MainActivity extends Activity {
                         LinearLayout card = new LinearLayout(this);
                         card.setOrientation(LinearLayout.VERTICAL);
                         card.setGravity(Gravity.CENTER);
-                        card.setPadding(dp(8), dp(7), dp(8), dp(7));
-                        card.setBackgroundColor(Color.rgb(25, 38, 65));
+                        card.setPadding(dp(9), dp(9), dp(9), dp(9));
+                        card.setBackground(dreamTileBackground(Color.rgb(25, 38, 65), false));
                         card.setFocusable(true);
                         card.setClickable(true);
                         card.setOnClickListener(v -> previewLiveDashboardChannel(id, name));
@@ -1768,20 +1773,22 @@ public class MainActivity extends Activity {
                             taps.onTouchEvent(event);
                             return true;
                         });
-                        card.setOnFocusChangeListener((v, focused) ->
-                            card.setBackgroundColor(id.equals(liveDashboardSelectedId)
-                                ? Color.rgb(17, 122, 194)
-                                : focused ? Color.rgb(48, 91, 192) : Color.rgb(25, 38, 65)));
+                        card.setOnFocusChangeListener((v, focused) -> {
+                            card.setBackground(dreamTileBackground(id.equals(liveDashboardSelectedId)
+                                ? Color.rgb(17, 90, 158) : Color.rgb(25, 38, 65), focused));
+                            card.setScaleX(focused ? 1.02f : 1f);
+                            card.setScaleY(focused ? 1.02f : 1f);
+                        });
                         liveDashboardCards.put(id, card);
                         liveDashboardCardNames.put(id, name);
-                        if (id.equals(liveDashboardSelectedId)) card.setBackgroundColor(Color.rgb(17, 122, 194));
+                        if (id.equals(liveDashboardSelectedId)) card.setBackground(dreamTileBackground(Color.rgb(17, 90, 158), false));
                         ImageView logo = new ImageView(this);
                         logo.setImageResource(android.R.drawable.ic_media_play);
                         logo.setScaleType(ImageView.ScaleType.FIT_CENTER);
-                        card.addView(logo, new LinearLayout.LayoutParams(-1, dp(34)));
+                        card.addView(logo, new LinearLayout.LayoutParams(-1, dp(42)));
                         loadArtwork(item.optString("stream_icon"), logo);
                         TextView title = text(name);
-                        title.setTextSize(12);
+                        title.setTextSize(13);
                         title.setGravity(Gravity.CENTER);
                         title.setMaxLines(2);
                         title.setEllipsize(android.text.TextUtils.TruncateAt.END);
@@ -1794,10 +1801,10 @@ public class MainActivity extends Activity {
                         card.addView(programme);
                         loadLiveCardEpg(id, programme);
                         GridLayout.LayoutParams params = new GridLayout.LayoutParams();
-                        int mainWidth = getResources().getDisplayMetrics().widthPixels -
-                            Math.min(dp(235), Math.max(dp(145), getResources().getDisplayMetrics().widthPixels / 4)) - dp(30);
-                        params.width = Math.max(dp(110), mainWidth / 3 - dp(9));
-                        params.height = dp(126);
+                        int mainWidth = getResources().getDisplayMetrics().widthPixels - sidebarWidthForLive() - dp(30);
+                        int columns = getResources().getDisplayMetrics().widthPixels >= dp(850) ? 4 : 3;
+                        params.width = Math.max(dp(110), mainWidth / columns - dp(9));
+                        params.height = dp(118);
                         params.setMargins(dp(3), dp(3), dp(3), dp(3));
                         liveDashboardChannels.addView(card, params);
                     }
