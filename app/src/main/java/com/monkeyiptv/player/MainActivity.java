@@ -2212,7 +2212,7 @@ public class MainActivity extends Activity {
         icon.setTextColor(featured ? Color.WHITE : Color.rgb(104, 183, 255));
         icon.setPadding(0, 0, 0, dp(8));
         panel.addView(icon);
-        String display = name.replaceFirst("(?i)^UK\\\\s*[|:]\\\\s*", "");
+        String display = name.replaceFirst("(?i)^UK *[|:] *", "");
         TextView title = text(display);
         title.setTextSize(16);
         title.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
