@@ -315,94 +315,189 @@ public class MainActivity extends Activity {
         return field;
     }
 
+    private int dreamHomeRequest = 0;
     private void showHome() {
         releasePlayer();
+        int request = ++dreamHomeRequest;
         setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
         getWindow().getDecorView().setSystemUiVisibility(0);
-        boolean compact = getResources().getDisplayMetrics().widthPixels < dp(650);
         LinearLayout page = new LinearLayout(this);
         page.setOrientation(LinearLayout.VERTICAL);
         page.setFitsSystemWindows(true);
-        page.setBackground(new GradientDrawable(GradientDrawable.Orientation.TL_BR,
-            new int[]{Color.rgb(13, 27, 49), Color.rgb(6, 14, 29), Color.rgb(5, 12, 25)}));
+        page.setBackgroundColor(Color.rgb(7, 14, 27));
         setContentView(page);
         LinearLayout navigation = new LinearLayout(this);
         navigation.setGravity(Gravity.CENTER_VERTICAL);
-        navigation.setPadding(dp(22), dp(8), dp(22), dp(8));
-        page.addView(navigation, new LinearLayout.LayoutParams(-1, dp(76)));
-        TextView logo = text("DREAM");
-        logo.setTextSize(29);
-        logo.setTypeface(Typeface.DEFAULT_BOLD);
-        logo.setTextColor(Color.rgb(88, 176, 255));
-        navigation.addView(logo, new LinearLayout.LayoutParams(0, -2, 1));
-        Button search = tile("⌕", Color.rgb(24, 40, 65), this::showSearch);
-        search.setTextSize(23);
-        navigation.addView(search, new LinearLayout.LayoutParams(dp(52), dp(46)));
-        Button settings = tile("⚙", Color.rgb(24, 40, 65), this::showHomeSettings);
-        settings.setTextSize(21);
-        LinearLayout.LayoutParams settingsParams = new LinearLayout.LayoutParams(dp(52), dp(46));
-        settingsParams.setMargins(dp(10), 0, 0, 0);
-        navigation.addView(settings, settingsParams);
+        navigation.setPadding(dp(22), dp(5), dp(22), dp(5));
+        page.addView(navigation, new LinearLayout.LayoutParams(-1, dp(65)));
+        TextView brand = text("DREAM");
+        brand.setTextSize(28);
+        brand.setTypeface(Typeface.DEFAULT_BOLD);
+        brand.setTextColor(Color.rgb(79, 168, 255));
+        navigation.addView(brand, new LinearLayout.LayoutParams(0, -2, 1));
+        Button search = tile("⌕", Color.rgb(21, 34, 56), this::showSearch);
+        navigation.addView(search, new LinearLayout.LayoutParams(dp(50), dp(44)));
+        Button settings = tile("⚙", Color.rgb(21, 34, 56), this::showHomeSettings);
+        LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(dp(50), dp(44));
+        sp.setMargins(dp(8), 0, 0, 0);
+        navigation.addView(settings, sp);
         ScrollView scroll = new ScrollView(this);
         scroll.setFillViewport(true);
         page.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
         LinearLayout content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
-        content.setPadding(dp(22), dp(8), dp(22), dp(28));
+        content.setPadding(dp(18), dp(5), dp(18), dp(28));
         scroll.addView(content);
-        LinearLayout hero = new LinearLayout(this);
-        hero.setOrientation(LinearLayout.VERTICAL);
-        hero.setGravity(Gravity.CENTER_VERTICAL);
-        hero.setPadding(dp(26), dp(22), dp(26), dp(22));
-        GradientDrawable heroBg = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
-            new int[]{Color.rgb(20, 76, 139), Color.rgb(17, 43, 79), Color.rgb(11, 24, 47)});
-        heroBg.setCornerRadius(dp(20));
-        heroBg.setStroke(dp(1), Color.rgb(51, 96, 147));
-        hero.setBackground(heroBg);
-        content.addView(hero, new LinearLayout.LayoutParams(-1, dp(compact ? 190 : 215)));
-        TextView eyebrow = text("YOUR ENTERTAINMENT, ALL IN ONE PLACE");
+        android.widget.FrameLayout hero = new android.widget.FrameLayout(this);
+        GradientDrawable heroBackground = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+            new int[]{Color.rgb(18, 54, 92), Color.rgb(12, 31, 57), Color.rgb(8, 18, 35)});
+        heroBackground.setCornerRadius(dp(17));
+        hero.setBackground(heroBackground);
+        hero.setClipToOutline(true);
+        content.addView(hero, new LinearLayout.LayoutParams(-1, dp(225)));
+        ImageView heroArtwork = new ImageView(this);
+        heroArtwork.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        heroArtwork.setAlpha(0.38f);
+        hero.addView(heroArtwork, new android.widget.FrameLayout.LayoutParams(-1, -1));
+        LinearLayout heroText = new LinearLayout(this);
+        heroText.setOrientation(LinearLayout.VERTICAL);
+        heroText.setGravity(Gravity.CENTER_VERTICAL);
+        heroText.setPadding(dp(26), dp(16), dp(26), dp(16));
+        hero.addView(heroText, new android.widget.FrameLayout.LayoutParams(-1, -1));
+        TextView eyebrow = text("FEATURED ON DREAM");
+        eyebrow.setTextColor(Color.rgb(140, 207, 255));
         eyebrow.setTextSize(12);
-        eyebrow.setTextColor(Color.rgb(166, 215, 255));
-        hero.addView(eyebrow);
-        TextView headline = text("Welcome to Dream");
-        headline.setTextSize(compact ? 28 : 36);
-        headline.setTypeface(Typeface.DEFAULT_BOLD);
-        headline.setPadding(0, dp(9), 0, dp(7));
-        hero.addView(headline);
-        TextView subheading = text("Live television, films and series. Ready when you are.");
-        subheading.setTextSize(15);
-        subheading.setTextColor(Color.rgb(205, 221, 239));
-        hero.addView(subheading);
-        TextView browseHeading = text("EXPLORE");
-        browseHeading.setTextSize(17);
-        browseHeading.setTypeface(Typeface.DEFAULT_BOLD);
-        browseHeading.setPadding(dp(4), dp(20), 0, dp(8));
-        content.addView(browseHeading);
-        LinearLayout primary = new LinearLayout(this);
-        primary.setOrientation(compact ? LinearLayout.VERTICAL : LinearLayout.HORIZONTAL);
-        content.addView(primary);
-        Button live = dreamHomeCard("▣", "LIVE TV", "Channels & live sports",
-            Color.rgb(25, 96, 171), this::showLiveDashboard);
-        addDreamHomeCard(primary, live, compact);
-        addDreamHomeCard(primary, dreamHomeCard("▤", "MOVIES", "Discover your next film",
-            Color.rgb(32, 54, 87), this::showMovieDashboard), compact);
-        addDreamHomeCard(primary, dreamHomeCard("▦", "SERIES", "Shows, seasons & episodes",
-            Color.rgb(32, 54, 87), this::showSeriesDashboard), compact);
-        TextView quickHeading = text("QUICK ACCESS");
-        quickHeading.setTextSize(17);
-        quickHeading.setTypeface(Typeface.DEFAULT_BOLD);
-        quickHeading.setPadding(dp(4), dp(20), 0, dp(8));
-        content.addView(quickHeading);
-        LinearLayout quick = new LinearLayout(this);
-        quick.setOrientation(compact ? LinearLayout.VERTICAL : LinearLayout.HORIZONTAL);
-        content.addView(quick);
-        addDreamHomeCard(quick, dreamHomeCard("▥", "TV GUIDE", "What's on now & next",
-            Color.rgb(24, 40, 65), this::showGuide), compact);
-        addDreamHomeCard(quick, dreamHomeCard("♡", "FAVOURITES", "Your saved channels",
-            Color.rgb(24, 40, 65), () -> showCategories("live")), compact);
-        addDreamHomeCard(quick, dreamHomeCard("⚙", "SETTINGS", "Manage Dream",
-            Color.rgb(24, 40, 65), this::showHomeSettings), compact);
-        live.requestFocus();
+        heroText.addView(eyebrow);
+        TextView featuredTitle = text("Your entertainment starts here");
+        featuredTitle.setTextSize(28);
+        featuredTitle.setTypeface(Typeface.DEFAULT_BOLD);
+        featuredTitle.setMaxLines(2);
+        heroText.addView(featuredTitle);
+        TextView featuredInfo = text("Live TV  •  Movies  •  Series");
+        featuredInfo.setTextSize(14);
+        featuredInfo.setTextColor(Color.rgb(205, 222, 241));
+        featuredInfo.setPadding(0, dp(7), 0, dp(12));
+        heroText.addView(featuredInfo);
+        Button featuredAction = tile("▶  EXPLORE MOVIES", Color.rgb(22, 113, 205), this::showMovieDashboard);
+        heroText.addView(featuredAction, new LinearLayout.LayoutParams(dp(195), dp(45)));
+        LinearLayout tabs = new LinearLayout(this);
+        tabs.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(-1, dp(63));
+        tp.setMargins(0, dp(8), 0, dp(10));
+        content.addView(tabs, tp);
+        String[] names = {"LIVE TV", "MOVIES", "SERIES", "TV GUIDE"};
+        Runnable[] actions = {this::showLiveDashboard, this::showMovieDashboard,
+            this::showSeriesDashboard, this::showGuide};
+        for (int i = 0; i < names.length; i++) {
+            Button tab = tile(names[i], i == 0 ? Color.rgb(23, 100, 179) : Color.rgb(22, 36, 59), actions[i]);
+            tab.setTextSize(14);
+            LinearLayout.LayoutParams tabParams = new LinearLayout.LayoutParams(0, dp(52), 1);
+            tabParams.setMargins(dp(4), 0, dp(4), 0);
+            tabs.addView(tab, tabParams);
+            if (i == 0) tab.requestFocus();
+        }
+        LinearLayout movies = dreamHomeShelf(content, "LATEST MOVIES", this::showMovieDashboard);
+        LinearLayout series = dreamHomeShelf(content, "DISCOVER SERIES", this::showSeriesDashboard);
+        new Thread(() -> {
+            try {
+                JSONArray vod = new JSONArray(fetch(api(username, password, "get_vod_streams")));
+                runOnUiThread(() -> {
+                    if (request != dreamHomeRequest) return;
+                    if (vod.length() > 0) {
+                        JSONObject first = vod.optJSONObject(0);
+                        if (first != null) {
+                            String title = first.optString("name", "Featured movie");
+                            featuredTitle.setText(title);
+                            featuredInfo.setText("MOVIE  •  Available to watch");
+                            String image = first.optString("stream_icon", "");
+                            if (!image.isEmpty()) loadArtwork(image, heroArtwork);
+                            featuredAction.setOnClickListener(v -> showMovieDetails(first.optString("stream_id"),
+                                title, first.optString("container_extension", "mp4"), image, first));
+                        }
+                    }
+                    dreamPopulateShelf(movies, vod, "vod", request);
+                });
+            } catch (Exception ignored) {
+                runOnUiThread(() -> {
+                    if (request == dreamHomeRequest) movies.addView(text("Browse your movies →"));
+                });
+            }
+        }).start();
+        new Thread(() -> {
+            try {
+                JSONArray shows = new JSONArray(fetch(api(username, password, "get_series")));
+                runOnUiThread(() -> {
+                    if (request == dreamHomeRequest) dreamPopulateShelf(series, shows, "series", request);
+                });
+            } catch (Exception ignored) {
+                runOnUiThread(() -> {
+                    if (request == dreamHomeRequest) series.addView(text("Browse your series →"));
+                });
+            }
+        }).start();
+    }
+
+    private LinearLayout dreamHomeShelf(LinearLayout parent, String title, Runnable action) {
+        LinearLayout header = new LinearLayout(this);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams hp = new LinearLayout.LayoutParams(-1, dp(49));
+        hp.setMargins(dp(4), dp(6), dp(4), 0);
+        parent.addView(header, hp);
+        TextView label = text(title);
+        label.setTextSize(18);
+        label.setTypeface(Typeface.DEFAULT_BOLD);
+        header.addView(label, new LinearLayout.LayoutParams(0, -2, 1));
+        Button all = tile("VIEW ALL  ›", Color.rgb(20, 35, 57), action);
+        all.setTextSize(12);
+        header.addView(all, new LinearLayout.LayoutParams(dp(115), dp(40)));
+        HorizontalScrollView scroller = new HorizontalScrollView(this);
+        scroller.setHorizontalScrollBarEnabled(false);
+        parent.addView(scroller, new LinearLayout.LayoutParams(-1, dp(230)));
+        LinearLayout shelf = new LinearLayout(this);
+        shelf.setOrientation(LinearLayout.HORIZONTAL);
+        scroller.addView(shelf);
+        return shelf;
+    }
+
+    private void dreamPopulateShelf(LinearLayout shelf, JSONArray items, String type, int request) {
+        shelf.removeAllViews();
+        int limit = Math.min(items.length(), 12);
+        for (int i = 0; i < limit; i++) {
+            JSONObject item = items.optJSONObject(i);
+            if (item == null) continue;
+            String name = item.optString("name", "Untitled");
+            String poster = item.optString(type.equals("series") ? "cover" : "stream_icon", "");
+            LinearLayout card = new LinearLayout(this);
+            card.setOrientation(LinearLayout.VERTICAL);
+            card.setFocusable(true);
+            card.setClickable(true);
+            card.setBackgroundColor(Color.rgb(24, 35, 55));
+            LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(dp(138), dp(216));
+            cp.setMargins(dp(4), dp(2), dp(8), dp(4));
+            shelf.addView(card, cp);
+            ImageView image = new ImageView(this);
+            image.setScaleType(ImageView.ScaleType.CENTER_CROP);
+            image.setBackgroundColor(Color.rgb(32, 46, 67));
+            card.addView(image, new LinearLayout.LayoutParams(-1, dp(171)));
+            if (!poster.isEmpty()) loadArtwork(poster, image);
+            TextView label = text(name);
+            label.setTextSize(12);
+            label.setGravity(Gravity.CENTER);
+            label.setMaxLines(2);
+            label.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            label.setPadding(dp(5), dp(2), dp(5), 0);
+            card.addView(label, new LinearLayout.LayoutParams(-1, dp(45)));
+            card.setOnFocusChangeListener((v, focused) -> {
+                card.setBackgroundColor(focused ? Color.rgb(25, 114, 207) : Color.rgb(24, 35, 55));
+                card.setScaleX(focused ? 1.04f : 1f);
+                card.setScaleY(focused ? 1.04f : 1f);
+            });
+            card.setOnClickListener(v -> {
+                if (type.equals("series")) showSeriesDetails(item.optString("series_id"), name, poster, item);
+                else showMovieDetails(item.optString("stream_id"), name,
+                    item.optString("container_extension", "mp4"), poster, item);
+            });
+        }
     }
 
     private Button dreamHomeCard(String symbol, String title, String subtitle, int color, Runnable action) {
