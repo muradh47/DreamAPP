@@ -373,7 +373,7 @@ public class MainActivity extends Activity {
         LinearLayout center = new LinearLayout(this);
         center.setOrientation(LinearLayout.VERTICAL);
         center.setGravity(Gravity.CENTER);
-        center.setPadding(dp(22), dp(10), dp(22), dp(16));
+        center.setPadding(dp(22), dp(2), dp(22), dp(2));
         page.addView(center, new LinearLayout.LayoutParams(-1, 0, 1));
         TextView heading = text("Your TV. Your way.");
         heading.setTextSize(24);
@@ -402,7 +402,7 @@ public class MainActivity extends Activity {
         LinearLayout footer = new LinearLayout(this);
         footer.setGravity(Gravity.CENTER);
         footer.setPadding(dp(20), dp(8), dp(20), dp(18));
-        page.addView(footer, new LinearLayout.LayoutParams(-1, dp(82)));
+        page.addView(footer, new LinearLayout.LayoutParams(-1, dp(100)));
         Button football = tile("⚽  FOOTBALL", Color.rgb(21, 83, 146), this::showFootball);
         football.setTextSize(13);
         LinearLayout.LayoutParams footballParams = new LinearLayout.LayoutParams(dp(175), dp(48));
@@ -1673,14 +1673,14 @@ public class MainActivity extends Activity {
         liveDashboardChannels.setPadding(dp(2), dp(2), dp(2), dp(8));
         channelScroll.addView(liveDashboardChannels);
         populateLiveDashboardCategories(categoryCache.get("live"));
-        selectLiveDashboardCategory("", "ALL CHANNELS");
+        selectLiveDashboardDefault(categoryCache.get("live"));
         if (categoryCache.get("live") == null) new Thread(() -> {
             try {
                 JSONArray cats = new JSONArray(fetch(api(username, password, "get_live_categories")));
                 categoryCache.put("live", cats);
                 runOnUiThread(() -> {
                     if (liveDashboardCategories != null && liveDashboardCategories.getParent() != null
-                        && "live".equals(currentType)) populateLiveDashboardCategories(cats);
+                        && "live".equals(currentType)) { populateLiveDashboardCategories(cats); selectLiveDashboardDefault(cats); }
                 });
             } catch (Exception ignored) { }
         }).start();
@@ -1689,6 +1689,22 @@ public class MainActivity extends Activity {
     private int sidebarWidthForLive() {
         int width = getResources().getDisplayMetrics().widthPixels;
         return Math.min(dp(205), Math.max(dp(145), width / 5));
+    }
+
+    private void selectLiveDashboardDefault(JSONArray categories) {
+        if (categories != null) {
+            for (int i = 0; i < categories.length(); i++) {
+                JSONObject category = categories.optJSONObject(i);
+                if (category == null) continue;
+                String name = category.optString("category_name", "");
+                String normalized = name.toUpperCase(java.util.Locale.UK).replaceAll("[^A-Z0-9]+", " ").trim();
+                if (normalized.contains("UK") && normalized.contains("FREE TO AIR")) {
+                    selectLiveDashboardCategory(category.optString("category_id"), name);
+                    return;
+                }
+            }
+        }
+        selectLiveDashboardCategory("", "ALL CHANNELS");
     }
 
     private void populateLiveDashboardCategories(JSONArray categories) {
