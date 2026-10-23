@@ -1621,7 +1621,8 @@ public class MainActivity extends Activity {
         int sidebarWidth = Math.min(dp(205), Math.max(dp(145), screenWidth / 5));
         ScrollView categoryScroll = new ScrollView(this);
         categoryScroll.setBackgroundColor(Color.rgb(14, 28, 57));
-        body.addView(categoryScroll, new LinearLayout.LayoutParams(sidebarWidth, -1));
+        // Categories have their own screen; channel view uses the full available width.
+        categoryScroll.setVisibility(View.GONE);
         liveDashboardCategories = new LinearLayout(this);
         liveDashboardCategories.setOrientation(LinearLayout.VERTICAL);
         liveDashboardCategories.setPadding(dp(5), dp(7), dp(5), dp(7));
@@ -1672,7 +1673,7 @@ public class MainActivity extends Activity {
         ScrollView channelScroll = new ScrollView(this);
         main.addView(channelScroll, new LinearLayout.LayoutParams(-1, 0, 1));
         liveDashboardChannels = new GridLayout(this);
-        liveDashboardChannels.setColumnCount(screenWidth >= dp(850) ? 4 : 3);
+        liveDashboardChannels.setColumnCount(screenWidth >= dp(850) ? 5 : 3);
         liveDashboardChannels.setPadding(dp(2), dp(2), dp(2), dp(8));
         channelScroll.addView(liveDashboardChannels);
         populateLiveDashboardCategories(categoryCache.get("live"));
@@ -1823,8 +1824,8 @@ public class MainActivity extends Activity {
                         card.addView(programme);
                         loadLiveCardEpg(id, programme);
                         GridLayout.LayoutParams params = new GridLayout.LayoutParams();
-                        int mainWidth = getResources().getDisplayMetrics().widthPixels - sidebarWidthForLive() - dp(30);
-                        int columns = getResources().getDisplayMetrics().widthPixels >= dp(850) ? 4 : 3;
+                        int mainWidth = getResources().getDisplayMetrics().widthPixels - dp(30);
+                        int columns = getResources().getDisplayMetrics().widthPixels >= dp(850) ? 5 : 3;
                         params.width = Math.max(dp(110), mainWidth / columns - dp(9));
                         params.height = dp(118);
                         params.setMargins(dp(3), dp(3), dp(3), dp(3));
@@ -1848,7 +1849,7 @@ public class MainActivity extends Activity {
         liveDashboardSelectedName = name;
         for (java.util.Map.Entry<String, LinearLayout> entry : liveDashboardCards.entrySet()) {
             boolean playing = id.equals(entry.getKey());
-            entry.getValue().setBackgroundColor(playing ? Color.rgb(17, 122, 194) : Color.rgb(25, 38, 65));
+            entry.getValue().setBackground(dreamTileBackground(playing ? Color.rgb(17, 90, 158) : Color.rgb(25, 38, 65), false));
             entry.getValue().setContentDescription((playing ? "NOW PLAYING: " : "") + entry.getKey());
         }
         liveDashboardTitle.setText(name);
