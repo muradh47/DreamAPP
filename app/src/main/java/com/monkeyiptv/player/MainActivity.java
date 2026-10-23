@@ -167,14 +167,19 @@ public class MainActivity extends Activity {
         root.setBackgroundColor(DREAM_BG);
         scroll.addView(root); setContentView(scroll);
         TextView heading = text(title);
-        heading.setTextSize(27); heading.setPadding(dp(8), dp(8), dp(8), dp(18)); root.addView(heading);
+        heading.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
+        heading.setTextSize(24); heading.setPadding(dp(8), dp(8), dp(8), dp(18)); root.addView(heading);
     }
 
     private Button button(String title, Runnable action) {
         Button b = new Button(this);
         b.setText(title);
         b.setAllCaps(false);
+        b.setTextColor(Color.WHITE);
+        b.setTextSize(15);
+        b.setBackground(dreamTileBackground(DREAM_PANEL, false));
         b.setFocusable(true);
+        b.setOnFocusChangeListener((v, focused) -> b.setBackground(dreamTileBackground(DREAM_PANEL, focused)));
         b.setOnClickListener(v -> action.run());
         root.addView(b);
         return b;
@@ -183,25 +188,25 @@ public class MainActivity extends Activity {
     private int dp(int n) { return (int) (n * getResources().getDisplayMetrics().density + 0.5f); }
 
     // Shared Dream UI theme: all primary navigation tiles use the same TV focus language.
-    private static final int DREAM_BG = Color.rgb(8, 15, 28);
-    private static final int DREAM_PANEL = Color.rgb(20, 34, 55);
-    private static final int DREAM_ACCENT = Color.rgb(37, 126, 222);
+    private static final int DREAM_BG = Color.rgb(7, 13, 24);
+    private static final int DREAM_PANEL = Color.rgb(19, 31, 51);
+    private static final int DREAM_ACCENT = Color.rgb(43, 136, 236);
 
     private GradientDrawable dreamTileBackground(int base, boolean focused) {
         GradientDrawable shape = new GradientDrawable(
             GradientDrawable.Orientation.TL_BR,
             focused ? new int[]{Color.rgb(40, 133, 232), Color.rgb(22, 91, 179)}
                     : new int[]{base, darken(base)});
-        shape.setCornerRadius(dp(14));
+        shape.setCornerRadius(dp(18));
         shape.setStroke(dp(focused ? 2 : 1),
-            focused ? Color.rgb(161, 217, 255) : Color.rgb(43, 65, 92));
+            focused ? Color.rgb(161, 217, 255) : Color.rgb(36, 55, 78));
         return shape;
     }
 
     private Button tile(String title, int color, Runnable action) {
         Button b = new Button(this);
         b.setText(title.replace("\\\\n", "\\n"));
-        b.setTextSize(18);
+        b.setTextSize(16);
         b.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
         b.setAllCaps(false);
         b.setGravity(Gravity.CENTER);
@@ -373,14 +378,14 @@ public class MainActivity extends Activity {
         LinearLayout center = new LinearLayout(this);
         center.setOrientation(LinearLayout.VERTICAL);
         center.setGravity(Gravity.CENTER);
-        center.setPadding(dp(22), dp(2), dp(22), dp(2));
+        center.setPadding(dp(22), 0, dp(22), dp(12));
         page.addView(center, new LinearLayout.LayoutParams(-1, 0, 1));
-        TextView heading = text("Your TV. Your way.");
-        heading.setTextSize(24);
+        TextView heading = text("Everything you love to watch.");
+        heading.setTextSize(26);
         heading.setTypeface(Typeface.DEFAULT_BOLD);
         heading.setGravity(Gravity.CENTER);
         center.addView(heading);
-        TextView subtitle = text("Live channels, films and series in one place.");
+        TextView subtitle = text("One place. Endless entertainment.");
         subtitle.setTextSize(14);
         subtitle.setTextColor(Color.rgb(150, 169, 192));
         subtitle.setGravity(Gravity.CENTER);
@@ -424,11 +429,11 @@ public class MainActivity extends Activity {
         LinearLayout panel = new LinearLayout(this);
         panel.setOrientation(LinearLayout.VERTICAL);
         panel.setGravity(Gravity.CENTER);
-        panel.setPadding(dp(15), dp(14), dp(15), dp(14));
+        panel.setPadding(dp(18), dp(16), dp(18), dp(16));
         GradientDrawable background = new GradientDrawable();
         background.setColor(color);
-        background.setCornerRadius(dp(17));
-        background.setStroke(dp(1), Color.rgb(44, 62, 88));
+        background.setCornerRadius(dp(22));
+        background.setStroke(dp(1), Color.rgb(45, 67, 94));
         panel.setBackground(background);
         panel.setFocusable(true);
         panel.setClickable(true);
@@ -436,7 +441,7 @@ public class MainActivity extends Activity {
         panel.setOnFocusChangeListener((v, focused) -> {
             GradientDrawable bg = new GradientDrawable();
             bg.setColor(focused ? Color.rgb(25, 105, 193) : color);
-            bg.setCornerRadius(dp(17));
+            bg.setCornerRadius(dp(22));
             bg.setStroke(dp(focused ? 3 : 1),
                 focused ? Color.rgb(137, 210, 255) : Color.rgb(44, 62, 88));
             panel.setBackground(bg);
@@ -444,12 +449,12 @@ public class MainActivity extends Activity {
             panel.setScaleY(focused ? 1.025f : 1f);
         });
         TextView icon = text(symbol);
-        icon.setTextSize(36);
+        icon.setTextSize(31);
         icon.setGravity(Gravity.CENTER);
         icon.setTextColor(Color.rgb(173, 213, 255));
         panel.addView(icon);
         TextView title = text(name);
-        title.setTextSize(22);
+        title.setTextSize(21);
         title.setTypeface(Typeface.DEFAULT_BOLD);
         title.setGravity(Gravity.CENTER);
         title.setPadding(0, dp(10), 0, dp(5));
@@ -460,7 +465,7 @@ public class MainActivity extends Activity {
         caption.setGravity(Gravity.CENTER);
         panel.addView(caption);
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-            stacked ? -1 : 0, dp(stacked ? 130 : 192), stacked ? 0 : 1);
+            stacked ? -1 : 0, dp(stacked ? 125 : 185), stacked ? 0 : 1);
         params.setMargins(dp(8), dp(7), dp(8), dp(7));
         parent.addView(panel, params);
     }
