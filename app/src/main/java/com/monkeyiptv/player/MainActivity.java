@@ -376,6 +376,11 @@ public class MainActivity extends Activity {
         footer.setGravity(Gravity.CENTER);
         footer.setPadding(dp(20), dp(8), dp(20), dp(18));
         page.addView(footer, new LinearLayout.LayoutParams(-1, dp(82)));
+        Button football = tile("⚽  FOOTBALL", Color.rgb(21, 83, 146), this::showFootball);
+        football.setTextSize(13);
+        LinearLayout.LayoutParams footballParams = new LinearLayout.LayoutParams(dp(175), dp(48));
+        footballParams.setMargins(dp(7), 0, dp(7), 0);
+        footer.addView(football, footballParams);
         Button guide = tile("▥  TV GUIDE", Color.rgb(19, 32, 53), this::showGuide);
         Button favourites = tile("♡  FAVOURITES", Color.rgb(19, 32, 53),
             () -> showCategories("live"));
@@ -431,6 +436,145 @@ public class MainActivity extends Activity {
             stacked ? -1 : 0, dp(stacked ? 130 : 220), stacked ? 0 : 1);
         params.setMargins(dp(8), dp(7), dp(8), dp(7));
         parent.addView(panel, params);
+    }
+
+    private int footballRequest = 0;
+
+    private void showFootball() {
+        releasePlayer();
+        final int request = ++footballRequest;
+        LinearLayout page = new LinearLayout(this);
+        page.setOrientation(LinearLayout.VERTICAL);
+        page.setFitsSystemWindows(true);
+        page.setBackgroundColor(Color.rgb(8, 15, 28));
+        setContentView(page);
+        LinearLayout header = new LinearLayout(this);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        header.setPadding(dp(20), dp(5), dp(20), dp(5));
+        page.addView(header, new LinearLayout.LayoutParams(-1, dp(66)));
+        Button back = tile("‹ BACK", Color.rgb(22, 36, 57), this::showHome);
+        back.setTextSize(13);
+        header.addView(back, new LinearLayout.LayoutParams(dp(105), dp(45)));
+        TextView title = text("  ⚽  Football on Dream");
+        title.setTypeface(Typeface.DEFAULT_BOLD);
+        title.setTextSize(22);
+        header.addView(title, new LinearLayout.LayoutParams(0, -2, 1));
+        Button reload = tile("↻", Color.rgb(22, 36, 57), this::showFootball);
+        header.addView(reload, new LinearLayout.LayoutParams(dp(50), dp(45)));
+        TextView subtitle = text("Live and upcoming football programmes from your TV service");
+        subtitle.setTextSize(13);
+        subtitle.setTextColor(Color.rgb(159, 180, 206));
+        subtitle.setPadding(dp(24), dp(4), dp(16), dp(12));
+        page.addView(subtitle);
+        ScrollView scroller = new ScrollView(this);
+        page.addView(scroller, new LinearLayout.LayoutParams(-1, 0, 1));
+        LinearLayout matches = new LinearLayout(this);
+        matches.setOrientation(LinearLayout.VERTICAL);
+        matches.setPadding(dp(20), 0, dp(20), dp(24));
+        scroller.addView(matches);
+        TextView loading = text("Finding football programmes in your channel guide…");
+        matches.addView(loading);
+        new Thread(() -> {
+            try {
+                JSONArray channels = new JSONArray(fetch(api(username, password, "get_live_streams")));
+                java.util.ArrayList<JSONObject> sports = new java.util.ArrayList<>();
+                for (int i = 0; i < channels.length(); i++) {
+                    JSONObject channel = channels.optJSONObject(i);
+                    if (channel == null) continue;
+                    String name = channel.optString("name", "").toLowerCase(java.util.Locale.ROOT);
+                    if (name.contains("sport") || name.contains("football") ||
+                        name.contains("soccer") || name.contains("premier") ||
+                        name.contains("tnt") || name.contains("bein") ||
+                        name.contains("dazn") || name.contains("espn"))
+                        sports.add(channel);
+                }
+                runOnUiThread(() -> {
+                    if (request != footballRequest) return;
+                    matches.removeAllViews();
+                    TextView section = text("FOOTBALL CHANNELS & FIXTURES");
+                    section.setTypeface(Typeface.DEFAULT_BOLD);
+                    section.setTextSize(17);
+                    section.setPadding(dp(4), dp(8), 0, dp(14));
+                    matches.addView(section);
+                });
+                int checked = 0;
+                for (JSONObject channel : sports) {
+                    if (request != footballRequest || checked++ >= 75) break;
+                    String id = channel.optString("stream_id", "");
+                    String name = channel.optString("name", "Sports channel");
+                    if (id.isEmpty()) continue;
+                    String programme = "";
+                    String time = "";
+                    try {
+                        JSONObject guide = new JSONObject(fetch(api(username, password, "get_short_epg")
+                            + "&stream_id=" + enc(id) + "&limit=12"));
+                        JSONArray entries = guide.optJSONArray("epg_listings");
+                        long now = System.currentTimeMillis();
+                        if (entries != null) for (int j = 0; j < entries.length(); j++) {
+                            JSONObject entry = entries.optJSONObject(j);
+                            if (entry == null) continue;
+                            long start = epgTime(entry.optString("start_timestamp"), entry.optString("start"));
+                            long end = epgTime(entry.optString("stop_timestamp"), entry.optString("end"));
+                            if (end < now || start > now + 24L * 3600000L) continue;
+                            String candidate = shortEpgLabel(entry);
+                            String lower = candidate.toLowerCase(java.util.Locale.ROOT);
+                            if (lower.contains("football") || lower.contains("soccer") ||
+                                lower.contains("premier league") || lower.contains("champions league") ||
+                                lower.contains(" vs ") || lower.contains(" v ") ||
+                                lower.contains("fa cup") || lower.contains("europa league") ||
+                                lower.contains("world cup")) {
+                                programme = candidate;
+                                time = guideProgrammeTime(entry);
+                                break;
+                            }
+                        }
+                    } catch (Exception ignored) {}
+                    final String show = programme;
+                    final String when = time;
+                    runOnUiThread(() -> {
+                        if (request != footballRequest) return;
+                        LinearLayout row = new LinearLayout(this);
+                        row.setOrientation(LinearLayout.VERTICAL);
+                        row.setPadding(dp(18), dp(13), dp(18), dp(13));
+                        GradientDrawable bg = new GradientDrawable();
+                        bg.setColor(Color.rgb(23, 36, 58));
+                        bg.setCornerRadius(dp(12));
+                        row.setBackground(bg);
+                        row.setFocusable(true);
+                        row.setClickable(true);
+                        LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(-1, -2);
+                        rp.setMargins(0, 0, 0, dp(9));
+                        matches.addView(row, rp);
+                        TextView channelName = text(name + "   ›");
+                        channelName.setTextSize(17);
+                        channelName.setTypeface(Typeface.DEFAULT_BOLD);
+                        row.addView(channelName);
+                        TextView detail = text(show.isEmpty()
+                            ? "Watch channel  •  Fixture information unavailable"
+                            : show + (when.isEmpty() ? "" : "   •   " + when));
+                        detail.setTextSize(13);
+                        detail.setTextColor(show.isEmpty() ? Color.rgb(145, 163, 187)
+                            : Color.rgb(145, 207, 255));
+                        detail.setPadding(0, dp(5), 0, 0);
+                        row.addView(detail);
+                        row.setOnClickListener(v -> play("live", id, "ts"));
+                        row.setOnFocusChangeListener((v, focus) ->
+                            row.setBackgroundColor(focus ? Color.rgb(28, 105, 189) : Color.rgb(23, 36, 58)));
+                    });
+                }
+                if (sports.isEmpty()) runOnUiThread(() -> {
+                    if (request == footballRequest)
+                        matches.addView(text("No sports channels found in your subscription."));
+                });
+            } catch (Exception error) {
+                runOnUiThread(() -> {
+                    if (request == footballRequest) {
+                        matches.removeAllViews();
+                        matches.addView(text("Could not load your channel guide. Try refresh."));
+                    }
+                });
+            }
+        }).start();
     }
 
     private LinearLayout dreamHomeShelf(LinearLayout parent, String title, Runnable action) {
