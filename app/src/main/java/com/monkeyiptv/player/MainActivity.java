@@ -497,6 +497,7 @@ public class MainActivity extends Activity {
         }).start();
     }
 
+    private final java.util.concurrent.ExecutorService guideExecutor = java.util.concurrent.Executors.newFixedThreadPool(5);
     private int guideCategoryRequest = 0;
     private void loadGuideCategory(int guide, String category, JSONArray channels, LinearLayout rows) {
         int request = ++guideCategoryRequest;
@@ -549,7 +550,7 @@ public class MainActivity extends Activity {
                 cell.setMargins(dp(2), dp(3), dp(2), dp(3));
                 line.addView(programme, cell);
             }
-            new Thread(() -> {
+            guideExecutor.execute(() -> {
                 try {
                     JSONObject data = new JSONObject(fetch(api(username, password, "get_short_epg")
                         + "&stream_id=" + enc(id) + "&limit=12"));
@@ -582,7 +583,7 @@ public class MainActivity extends Activity {
                         }
                     });
                 }
-            }).start();
+            });
             shown++;
         }
         if (shown == 0) rows.addView(text("No channels in this category."));
