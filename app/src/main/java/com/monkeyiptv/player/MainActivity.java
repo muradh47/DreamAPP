@@ -490,25 +490,30 @@ public class MainActivity extends Activity {
                 uk.setTimeZone(java.util.TimeZone.getTimeZone("Europe/London"));
                 if (kickoff != null) { local = uk.format(kickoff); kickoffMs = kickoff.getTime(); }
             } catch (Exception ignored) {}
-            JSONObject best = null;
+            final java.util.ArrayList<JSONObject> options = new java.util.ArrayList<>();
+            java.util.HashSet<String> ids = new java.util.HashSet<>();
             synchronized (footballGuideEntries) {
                 for (JSONObject entry : footballGuideEntries) {
                     String programme = entry.optString("programme");
                     if (!footballTeamFound(programme, home) || !footballTeamFound(programme, away)) continue;
                     long epgStart = entry.optLong("startMs");
                     if (kickoffMs > 0 && epgStart > 0 && Math.abs(kickoffMs - epgStart) > 3L * 3600000L) continue;
-                    best = entry;
-                    break;
+                    if (ids.add(entry.optString("id"))) options.add(entry);
                 }
             }
-            JSONObject possible = null;
             synchronized (footballTeamStreams) {
                 for (JSONObject stream : footballTeamStreams) {
                     String streamName = stream.optString("name");
-                    if (footballTeamFound(streamName, home) || footballTeamFound(streamName, away)) {
-                        possible = stream;
-                        break;
-                    }
+                    if (!footballTeamFound(streamName, home) && !footballTeamFound(streamName, away)) continue;
+                    String id = stream.optString("stream_id");
+                    if (id.isEmpty() || !ids.add(id)) continue;
+                    JSONObject option = new JSONObject();
+                    try {
+                        option.put("id", id);
+                        option.put("channel", streamName);
+                        option.put("possible", true);
+                        options.add(option);
+                    } catch (Exception ignored) {}
                 }
             }
             LinearLayout card = new LinearLayout(this);
@@ -529,36 +534,60 @@ public class MainActivity extends Activity {
             detail.setTextSize(12);
             detail.setTextColor(Color.rgb(153, 190, 228));
             card.addView(detail);
-            if (best != null) {
-                String channelId = best.optString("id");
-                String channelName = best.optString("channel");
-                TextView watch = text("▶  WATCH ON " + channelName);
-                watch.setTextSize(13);
-                watch.setTextColor(Color.rgb(125, 209, 255));
-                watch.setPadding(0, dp(7), 0, 0);
-                card.addView(watch);
-                card.setFocusable(true);
-                card.setClickable(true);
-                card.setOnClickListener(v -> play("live", channelId, "ts"));
-                card.setOnFocusChangeListener((v, focus) ->
-                    card.setBackgroundColor(focus ? Color.rgb(28, 105, 189) : Color.rgb(23, 36, 58)));
-            } else {
-                final JSONObject candidate = possible;
-                TextView missing = text(candidate == null
-                    ? "Channel not confirmed in your EPG"
-                    : "Possible team stream: " + candidate.optString("name") + "  ›");
-                missing.setTextSize(12);
-                missing.setTextColor(Color.rgb(142, 162, 186));
-                card.addView(missing);
-                if (candidate != null) {
-                    String streamId = candidate.optString("stream_id");
-                    card.setFocusable(true);
-                    card.setClickable(true);
-                    card.setOnClickListener(v -> play("live", streamId, "ts"));
-                    card.setOnFocusChangeListener((v, focus) ->
-                        card.setBackgroundColor(focus ? Color.rgb(28, 105, 189) : Color.rgb(23, 36, 58)));
-                }
-            }
+            TextView status = text(options.isEmpty() ? "No matching channels found" :
+                options.size() + " channel option" + (options.size() == 1 ? "" : "s") + "  ›");
+            status.setTextSize(13);
+            status.setTextColor(options.isEmpty() ? Color.rgb(142, 162, 186) : Color.rgb(125, 209, 255));
+            status.setPadding(0, dp(7), 0, 0);
+            card.addView(status);
+            card.setFocusable(true);
+            card.setClickable(true);
+            card.setOnClickListener(v -> showFootballChannelChoices(home + " vs " + away, options));
+            card.setOnFocusChangeListener((v, focus) ->
+                card.setBackgroundColor(focus ? Color.rgb(28, 105, 189) : Color.rgb(23, 36, 58)));
+        }
+    }
+
+    private void showFootballChannelChoices(String fixture, java.util.ArrayList<JSONObject> options) {
+        LinearLayout page = new LinearLayout(this);
+        page.setOrientation(LinearLayout.VERTICAL);
+        page.setFitsSystemWindows(true);
+        page.setBackgroundColor(Color.rgb(8, 15, 28));
+        setContentView(page);
+        LinearLayout header = new LinearLayout(this);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        header.setPadding(dp(20), dp(8), dp(20), dp(8));
+        page.addView(header, new LinearLayout.LayoutParams(-1, dp(72)));
+        Button back = tile("‹ FIXTURES", Color.rgb(22, 36, 57), this::showFootball);
+        back.setTextSize(13);
+        header.addView(back, new LinearLayout.LayoutParams(dp(140), dp(46)));
+        TextView heading = text("  " + fixture);
+        heading.setTextSize(20);
+        heading.setTypeface(Typeface.DEFAULT_BOLD);
+        header.addView(heading);
+        TextView hint = text("Select a channel to watch  •  Suggested streams are not confirmed broadcasts");
+        hint.setTextColor(Color.rgb(155, 179, 208));
+        hint.setTextSize(13);
+        hint.setPadding(dp(24), dp(4), dp(16), dp(14));
+        page.addView(hint);
+        ScrollView scroll = new ScrollView(this);
+        page.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+        LinearLayout list = new LinearLayout(this);
+        list.setOrientation(LinearLayout.VERTICAL);
+        list.setPadding(dp(20), 0, dp(20), dp(20));
+        scroll.addView(list);
+        if (options.isEmpty()) list.addView(text("No channels matched this fixture in EPL Hub, iFollow or your EPG."));
+        for (JSONObject option : options) {
+            String channelId = option.optString("id");
+            String channel = option.optString("channel");
+            boolean possible = option.optBoolean("possible", false);
+            Button choice = tile(channel + (possible ? "   •   POSSIBLE STREAM" : "   •   EPG MATCH"),
+                Color.rgb(23, 36, 58), () -> play("live", channelId, "ts"));
+            choice.setTextSize(16);
+            choice.setGravity(Gravity.CENTER_VERTICAL | Gravity.LEFT);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, dp(70));
+            lp.setMargins(0, 0, 0, dp(9));
+            list.addView(choice, lp);
         }
     }
 
