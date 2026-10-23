@@ -413,27 +413,187 @@ public class MainActivity extends Activity {
         });
     }
 
+    private int guideRequest = 0;
     private void showGuide() {
-        screen("Loading TV guide...");
+        releasePlayer();
+        int request = ++guideRequest;
+        setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
+        getWindow().getDecorView().setSystemUiVisibility(0);
+        LinearLayout page = new LinearLayout(this);
+        page.setOrientation(LinearLayout.VERTICAL);
+        page.setFitsSystemWindows(true);
+        page.setBackgroundColor(Color.rgb(9, 17, 37));
+        setContentView(page);
+        LinearLayout header = new LinearLayout(this);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        header.setPadding(dp(12), dp(6), dp(12), dp(6));
+        page.addView(header, new LinearLayout.LayoutParams(-1, dp(60)));
+        Button back = tile("‹ HOME", Color.rgb(25, 42, 75), this::showHome);
+        header.addView(back, new LinearLayout.LayoutParams(dp(105), dp(46)));
+        TextView heading = text("DREAM IPTV  /  TV GUIDE");
+        heading.setTextSize(21);
+        heading.setTypeface(Typeface.DEFAULT_BOLD);
+        header.addView(heading, new LinearLayout.LayoutParams(0, -2, 1));
+        Button refresh = tile("↻ REFRESH", Color.rgb(25, 42, 75), this::showGuide);
+        header.addView(refresh, new LinearLayout.LayoutParams(dp(115), dp(46)));
+        TextView hint = text("NOW & NEXT  •  Select a programme to watch live");
+        hint.setTextSize(13);
+        hint.setTextColor(Color.rgb(163, 192, 230));
+        page.addView(hint);
+        LinearLayout body = new LinearLayout(this);
+        page.addView(body, new LinearLayout.LayoutParams(-1, 0, 1));
+        ScrollView categoryScroll = new ScrollView(this);
+        categoryScroll.setBackgroundColor(Color.rgb(15, 29, 58));
+        body.addView(categoryScroll, new LinearLayout.LayoutParams(dp(185), -1));
+        LinearLayout categories = new LinearLayout(this);
+        categories.setOrientation(LinearLayout.VERTICAL);
+        categoryScroll.addView(categories);
+        ScrollView listingScroll = new ScrollView(this);
+        body.addView(listingScroll, new LinearLayout.LayoutParams(0, -1, 1));
+        LinearLayout guideRows = new LinearLayout(this);
+        guideRows.setOrientation(LinearLayout.VERTICAL);
+        listingScroll.addView(guideRows);
+        guideRows.addView(text("Loading live channels and guide..."));
         new Thread(() -> {
             try {
-                JSONArray channels = new JSONArray(fetch(api(username, password, "get_live_streams")));
+                JSONArray allChannels = new JSONArray(fetch(api(username, password, "get_live_streams")));
+                JSONArray categoryData = new JSONArray(fetch(api(username, password, "get_live_categories")));
                 runOnUiThread(() -> {
-                    screen("TV GUIDE");
-                    button("← Home", this::showHome);
-                    for (int i = 0; i < channels.length(); i++) {
-                        JSONObject ch = channels.optJSONObject(i);
-                        if (ch == null) continue;
-                        String id = ch.optString("stream_id");
-                        if (id.isEmpty()) continue;
-                        button(ch.optString("name", "Channel") + "  →", () -> showEpg(id, ch.optString("name")));
+                    if (request != guideRequest) return;
+                    categories.removeAllViews();
+                    final java.util.ArrayList<Button> categoryButtons = new java.util.ArrayList<>();
+                    final java.util.ArrayList<String> categoryIds = new java.util.ArrayList<>();
+                    java.util.function.BiConsumer<String, String> addCategory = (id, label) -> {
+                        Button item = tile(label, Color.rgb(25, 42, 75), () -> {});
+                        item.setTextSize(12);
+                        item.setGravity(Gravity.CENTER_VERTICAL | Gravity.LEFT);
+                        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, dp(54));
+                        params.setMargins(dp(5), dp(3), dp(5), dp(3));
+                        categories.addView(item, params);
+                        categoryButtons.add(item);
+                        categoryIds.add(id);
+                        item.setOnClickListener(v -> {
+                            for (int k = 0; k < categoryButtons.size(); k++)
+                                categoryButtons.get(k).setBackgroundTintList(android.content.res.ColorStateList.valueOf(
+                                    categoryIds.get(k).equals(id) ? Color.rgb(24, 113, 197) : Color.rgb(25, 42, 75)));
+                            loadGuideCategory(request, id, allChannels, guideRows);
+                        });
+                    };
+                    addCategory.accept("", "ALL CHANNELS");
+                    for (int i = 0; i < categoryData.length(); i++) {
+                        JSONObject category = categoryData.optJSONObject(i);
+                        if (category != null) addCategory.accept(category.optString("category_id"),
+                            category.optString("category_name", "Category"));
                     }
+                    if (!categoryButtons.isEmpty()) categoryButtons.get(0).performClick();
                 });
-            } catch (Exception ex) { runOnUiThread(() -> {
-                screen("TV guide unavailable"); root.addView(text(ex.getMessage()));
-                button("← Home", this::showHome);
-            }); }
+            } catch (Exception e) {
+                runOnUiThread(() -> {
+                    if (request != guideRequest) return;
+                    guideRows.removeAllViews();
+                    guideRows.addView(text("Unable to load TV guide. Check your connection and try Refresh."));
+                });
+            }
         }).start();
+    }
+
+    private int guideCategoryRequest = 0;
+    private void loadGuideCategory(int guide, String category, JSONArray channels, LinearLayout rows) {
+        int request = ++guideCategoryRequest;
+        rows.removeAllViews();
+        LinearLayout timeline = new LinearLayout(this);
+        timeline.setBackgroundColor(Color.rgb(17, 39, 73));
+        timeline.setGravity(Gravity.CENTER_VERTICAL);
+        TextView channelHeading = text("CHANNEL");
+        channelHeading.setTextSize(12);
+        timeline.addView(channelHeading, new LinearLayout.LayoutParams(dp(190), dp(48)));
+        TextView nowHeading = text("ON NOW");
+        nowHeading.setTextSize(12);
+        timeline.addView(nowHeading, new LinearLayout.LayoutParams(0, dp(48), 1));
+        TextView nextHeading = text("UP NEXT");
+        nextHeading.setTextSize(12);
+        timeline.addView(nextHeading, new LinearLayout.LayoutParams(0, dp(48), 1));
+        rows.addView(timeline);
+        int shown = 0;
+        for (int i = 0; i < channels.length() && shown < 70; i++) {
+            JSONObject ch = channels.optJSONObject(i);
+            if (ch == null || (!category.isEmpty() && !category.equals(ch.optString("category_id")))) continue;
+            String id = ch.optString("stream_id", "");
+            if (id.isEmpty()) continue;
+            String name = ch.optString("name", "Channel");
+            LinearLayout line = new LinearLayout(this);
+            line.setGravity(Gravity.CENTER_VERTICAL);
+            line.setBackgroundColor(shown % 2 == 0 ? Color.rgb(22, 34, 58) : Color.rgb(17, 28, 48));
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, dp(78));
+            lp.setMargins(0, 0, 0, dp(2));
+            rows.addView(line, lp);
+            TextView channelName = text(name);
+            channelName.setTextSize(13);
+            channelName.setMaxLines(2);
+            channelName.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            channelName.setOnClickListener(v -> showChannel(id, name));
+            channelName.setFocusable(true);
+            line.addView(channelName, new LinearLayout.LayoutParams(dp(190), -1));
+            TextView now = text("Loading programme...");
+            TextView next = text("Loading...");
+            for (TextView programme : new TextView[]{now, next}) {
+                programme.setTextSize(13);
+                programme.setMaxLines(3);
+                programme.setEllipsize(android.text.TextUtils.TruncateAt.END);
+                programme.setFocusable(true);
+                programme.setBackgroundColor(Color.rgb(28, 48, 78));
+                programme.setOnClickListener(v -> showChannel(id, name));
+                programme.setOnFocusChangeListener((v, focused) ->
+                    programme.setBackgroundColor(focused ? Color.rgb(24, 113, 197) : Color.rgb(28, 48, 78)));
+                LinearLayout.LayoutParams cell = new LinearLayout.LayoutParams(0, -1, 1);
+                cell.setMargins(dp(2), dp(3), dp(2), dp(3));
+                line.addView(programme, cell);
+            }
+            new Thread(() -> {
+                try {
+                    JSONObject data = new JSONObject(fetch(api(username, password, "get_short_epg")
+                        + "&stream_id=" + enc(id) + "&limit=12"));
+                    JSONArray entries = data.optJSONArray("epg_listings");
+                    long clock = System.currentTimeMillis();
+                    JSONObject current = null, upcoming = null;
+                    if (entries != null) for (int k = 0; k < entries.length(); k++) {
+                        JSONObject ep = entries.optJSONObject(k);
+                        if (ep == null) continue;
+                        long start = epgTime(ep.optString("start_timestamp"), ep.optString("start"));
+                        long end = epgTime(ep.optString("stop_timestamp"), ep.optString("end"));
+                        if (start <= clock && end > clock) current = ep;
+                        if (start > clock && (upcoming == null ||
+                            start < epgTime(upcoming.optString("start_timestamp"), upcoming.optString("start"))))
+                            upcoming = ep;
+                    }
+                    JSONObject currentFinal = current, upcomingFinal = upcoming;
+                    runOnUiThread(() -> {
+                        if (guide != guideRequest || request != guideCategoryRequest) return;
+                        now.setText(currentFinal == null ? "No programme information" :
+                            "● NOW  " + shortEpgLabel(currentFinal) + "\n" + guideProgrammeTime(currentFinal));
+                        next.setText(upcomingFinal == null ? "No upcoming information" :
+                            shortEpgLabel(upcomingFinal) + "\n" + guideProgrammeTime(upcomingFinal));
+                    });
+                } catch (Exception ignored) {
+                    runOnUiThread(() -> {
+                        if (guide == guideRequest && request == guideCategoryRequest) {
+                            now.setText("Guide unavailable");
+                            next.setText("—");
+                        }
+                    });
+                }
+            }).start();
+            shown++;
+        }
+        if (shown == 0) rows.addView(text("No channels in this category."));
+    }
+
+    private String guideProgrammeTime(JSONObject ep) {
+        long start = epgTime(ep.optString("start_timestamp"), ep.optString("start"));
+        long end = epgTime(ep.optString("stop_timestamp"), ep.optString("end"));
+        if (start <= 0 || end <= 0) return "";
+        java.text.SimpleDateFormat time = new java.text.SimpleDateFormat("HH:mm", java.util.Locale.UK);
+        return time.format(new java.util.Date(start)) + "–" + time.format(new java.util.Date(end));
     }
 
     private void showChannel(String id, String name) {
