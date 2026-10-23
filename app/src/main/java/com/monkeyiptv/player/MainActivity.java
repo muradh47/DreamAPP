@@ -461,7 +461,7 @@ public class MainActivity extends Activity {
         header.addView(title, new LinearLayout.LayoutParams(0, -2, 1));
         Button reload = tile("↻", Color.rgb(22, 36, 57), this::showFootball);
         header.addView(reload, new LinearLayout.LayoutParams(dp(50), dp(45)));
-        TextView subtitle = text("Live and upcoming football programmes from your TV service");
+        TextView subtitle = text("UK fixtures and football channels from your subscription");
         subtitle.setTextSize(13);
         subtitle.setTextColor(Color.rgb(159, 180, 206));
         subtitle.setPadding(dp(24), dp(4), dp(16), dp(12));
@@ -491,10 +491,10 @@ public class MainActivity extends Activity {
                     JSONObject channel = channels.optJSONObject(i);
                     if (channel == null) continue;
                     String name = channel.optString("name", "").toLowerCase(java.util.Locale.ROOT);
-                    if (name.contains("sport") || name.contains("football") ||
+                    if ((name.startsWith("uk:") || name.startsWith("uk ") || name.startsWith("gb:") || name.startsWith("gb ") || name.startsWith("sky sports") || name.startsWith("tnt sports") || name.startsWith("bt sport") || name.startsWith("premier sports")) && (name.contains("sport") || name.contains("football") ||
                         name.contains("soccer") || name.contains("premier") ||
                         name.contains("tnt") || name.contains("bein") ||
-                        name.contains("dazn") || name.contains("espn"))
+                        name.contains("dazn") || name.contains("espn")))
                         sports.add(channel);
                 }
                 runOnUiThread(() -> {
@@ -588,10 +588,10 @@ public class MainActivity extends Activity {
 
     private void loadUkFootballFixtures(int request, LinearLayout target) {
         java.util.ArrayList<JSONObject> events = new java.util.ArrayList<>();
-        String[][] leagues = {{"4328", "Premier League"}, {"4329", "Championship"}};
+        String[][] leagues = {{"4328", "Premier League"}, {"4329", "Championship"}, {"4330", "League One"}, {"4331", "League Two"}};
         for (String[] league : leagues) {
             try {
-                String endpoint = "https://www.thesportsdb.com/api/v1/json/3/eventsnextleague.php?id=" + league[0];
+                String endpoint = "https://www.thesportsdb.com/api/v1/json/123/eventsnextleague.php?id=" + league[0];
                 JSONObject response = new JSONObject(fetchAbsolute(endpoint));
                 JSONArray data = response.optJSONArray("events");
                 if (data == null) continue;
@@ -616,7 +616,7 @@ public class MainActivity extends Activity {
             heading.setPadding(0, dp(4), 0, dp(9));
             target.addView(heading);
             if (events.isEmpty()) {
-                TextView unavailable = text("Fixture feed unavailable. Your IPTV football channels are below.");
+                TextView unavailable = text("Fixtures could not be retrieved. Try refresh; UK sports channels appear below.");
                 unavailable.setTextColor(Color.rgb(155, 177, 201));
                 unavailable.setTextSize(13);
                 target.addView(unavailable);
