@@ -440,6 +440,7 @@ public class MainActivity extends Activity {
 
     private final java.util.ArrayList<JSONObject> footballGuideEntries = new java.util.ArrayList<>();
     private final java.util.ArrayList<JSONObject> footballFixtures = new java.util.ArrayList<>();
+    private final java.util.ArrayList<JSONObject> footballTeamStreams = new java.util.ArrayList<>();
     private LinearLayout footballFixtureContainer;
 
     private String footballNormalise(String name) {
@@ -500,6 +501,16 @@ public class MainActivity extends Activity {
                     break;
                 }
             }
+            JSONObject possible = null;
+            synchronized (footballTeamStreams) {
+                for (JSONObject stream : footballTeamStreams) {
+                    String streamName = stream.optString("name");
+                    if (footballTeamFound(streamName, home) || footballTeamFound(streamName, away)) {
+                        possible = stream;
+                        break;
+                    }
+                }
+            }
             LinearLayout card = new LinearLayout(this);
             card.setOrientation(LinearLayout.VERTICAL);
             card.setPadding(dp(15), dp(11), dp(15), dp(11));
@@ -532,10 +543,21 @@ public class MainActivity extends Activity {
                 card.setOnFocusChangeListener((v, focus) ->
                     card.setBackgroundColor(focus ? Color.rgb(28, 105, 189) : Color.rgb(23, 36, 58)));
             } else {
-                TextView missing = text("Channel not confirmed in your EPG");
+                final JSONObject candidate = possible;
+                TextView missing = text(candidate == null
+                    ? "Channel not confirmed in your EPG"
+                    : "Possible team stream: " + candidate.optString("name") + "  ›");
                 missing.setTextSize(12);
                 missing.setTextColor(Color.rgb(142, 162, 186));
                 card.addView(missing);
+                if (candidate != null) {
+                    String streamId = candidate.optString("stream_id");
+                    card.setFocusable(true);
+                    card.setClickable(true);
+                    card.setOnClickListener(v -> play("live", streamId, "ts"));
+                    card.setOnFocusChangeListener((v, focus) ->
+                        card.setBackgroundColor(focus ? Color.rgb(28, 105, 189) : Color.rgb(23, 36, 58)));
+                }
             }
         }
     }
@@ -569,6 +591,7 @@ public class MainActivity extends Activity {
         final int request = ++footballRequest;
         synchronized (footballGuideEntries) { footballGuideEntries.clear(); }
         footballFixtures.clear();
+        synchronized (footballTeamStreams) { footballTeamStreams.clear(); }
         LinearLayout page = new LinearLayout(this);
         page.setOrientation(LinearLayout.VERTICAL);
         page.setFitsSystemWindows(true);
@@ -613,6 +636,30 @@ public class MainActivity extends Activity {
         new Thread(() -> {
             try {
                 JSONArray channels = new JSONArray(fetch(api(username, password, "get_live_streams")));
+                java.util.HashSet<String> footballCategoryIds = new java.util.HashSet<>();
+                try {
+                    JSONArray cats = new JSONArray(fetch(api(username, password, "get_live_categories")));
+                    for (int ci = 0; ci < cats.length(); ci++) {
+                        JSONObject cat = cats.optJSONObject(ci);
+                        if (cat == null) continue;
+                        String label = cat.optString("category_name", "").toLowerCase(java.util.Locale.UK);
+                        if (label.contains("ifollow") || label.contains("i-follow") ||
+                            label.contains("epl hub") || label.contains("epl") ||
+                            label.contains("efl") || label.contains("football"))
+                            footballCategoryIds.add(cat.optString("category_id"));
+                    }
+                } catch (Exception ignored) {}
+                synchronized (footballTeamStreams) {
+                    for (int ci = 0; ci < channels.length(); ci++) {
+                        JSONObject channel = channels.optJSONObject(ci);
+                        if (channel == null) continue;
+                        String channelName = channel.optString("name", "").toLowerCase(java.util.Locale.UK);
+                        if (footballCategoryIds.contains(channel.optString("category_id")) ||
+                            channelName.contains("ifollow") || channelName.contains("epl hub"))
+                            footballTeamStreams.add(channel);
+                    }
+                }
+                runOnUiThread(() -> footballRenderFixtures(request));
                 java.util.ArrayList<JSONObject> sports = new java.util.ArrayList<>();
                 for (int i = 0; i < channels.length(); i++) {
                     JSONObject channel = channels.optJSONObject(i);
