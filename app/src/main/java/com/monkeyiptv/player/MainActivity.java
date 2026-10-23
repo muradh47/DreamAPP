@@ -155,7 +155,7 @@ public class MainActivity extends Activity {
     private TextView text(String value) {
         TextView view = new TextView(this);
         view.setText(value); view.setTextColor(Color.WHITE); view.setTextSize(19);
-        view.setPadding(14, 16, 14, 16); return view;
+        view.setFontFeatureSettings("kern"); view.setPadding(dp(10), dp(10), dp(10), dp(10)); return view;
     }
 
     private void screen(String title) {
@@ -164,7 +164,7 @@ public class MainActivity extends Activity {
         root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(dp(18), dp(22), dp(18), dp(24));
-        root.setBackgroundColor(Color.rgb(13, 18, 30));
+        root.setBackgroundColor(DREAM_BG);
         scroll.addView(root); setContentView(scroll);
         TextView heading = text(title);
         heading.setTextSize(27); heading.setPadding(dp(8), dp(8), dp(8), dp(18)); root.addView(heading);
@@ -182,14 +182,41 @@ public class MainActivity extends Activity {
 
     private int dp(int n) { return (int) (n * getResources().getDisplayMetrics().density + 0.5f); }
 
+    // Shared Dream UI theme: all primary navigation tiles use the same TV focus language.
+    private static final int DREAM_BG = Color.rgb(8, 15, 28);
+    private static final int DREAM_PANEL = Color.rgb(20, 34, 55);
+    private static final int DREAM_ACCENT = Color.rgb(37, 126, 222);
+
+    private GradientDrawable dreamTileBackground(int base, boolean focused) {
+        GradientDrawable shape = new GradientDrawable(
+            GradientDrawable.Orientation.TL_BR,
+            focused ? new int[]{Color.rgb(40, 133, 232), Color.rgb(22, 91, 179)}
+                    : new int[]{base, darken(base)});
+        shape.setCornerRadius(dp(14));
+        shape.setStroke(dp(focused ? 2 : 1),
+            focused ? Color.rgb(161, 217, 255) : Color.rgb(43, 65, 92));
+        return shape;
+    }
+
     private Button tile(String title, int color, Runnable action) {
         Button b = new Button(this);
-        b.setText(title.replace("\\\\n", "\\n")); b.setTextSize(19); b.setAllCaps(false);
-        b.setGravity(Gravity.CENTER); b.setPadding(dp(8), dp(8), dp(8), dp(8));
-        b.setMinHeight(0); b.setMinimumHeight(0);
-        b.setTextColor(Color.WHITE); b.setFocusable(true);
-        GradientDrawable bg = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[]{color, darken(color)});
-        bg.setCornerRadius(dp(12)); b.setBackground(bg);
+        b.setText(title.replace("\\\\n", "\\n"));
+        b.setTextSize(18);
+        b.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+        b.setAllCaps(false);
+        b.setGravity(Gravity.CENTER);
+        b.setPadding(dp(12), dp(9), dp(12), dp(9));
+        b.setMinHeight(0);
+        b.setMinimumHeight(0);
+        b.setTextColor(Color.WHITE);
+        b.setFocusable(true);
+        b.setBackground(dreamTileBackground(color, false));
+        b.setOnFocusChangeListener((view, focused) -> {
+            b.setBackground(dreamTileBackground(color, focused));
+            b.setElevation(dp(focused ? 9 : 1));
+            b.setScaleX(focused ? 1.025f : 1f);
+            b.setScaleY(focused ? 1.025f : 1f);
+        });
         b.setOnClickListener(v -> action.run());
         return b;
     }
@@ -324,7 +351,7 @@ public class MainActivity extends Activity {
         LinearLayout page = new LinearLayout(this);
         page.setOrientation(LinearLayout.VERTICAL);
         page.setFitsSystemWindows(true);
-        page.setBackgroundColor(Color.rgb(8, 15, 28));
+        page.setBackgroundColor(DREAM_BG);
         setContentView(page);
         LinearLayout header = new LinearLayout(this);
         header.setGravity(Gravity.CENTER_VERTICAL);
@@ -552,7 +579,7 @@ public class MainActivity extends Activity {
         LinearLayout page = new LinearLayout(this);
         page.setOrientation(LinearLayout.VERTICAL);
         page.setFitsSystemWindows(true);
-        page.setBackgroundColor(Color.rgb(8, 15, 28));
+        page.setBackgroundColor(DREAM_BG);
         setContentView(page);
         LinearLayout header = new LinearLayout(this);
         header.setGravity(Gravity.CENTER_VERTICAL);
@@ -624,7 +651,7 @@ public class MainActivity extends Activity {
         LinearLayout page = new LinearLayout(this);
         page.setOrientation(LinearLayout.VERTICAL);
         page.setFitsSystemWindows(true);
-        page.setBackgroundColor(Color.rgb(8, 15, 28));
+        page.setBackgroundColor(DREAM_BG);
         setContentView(page);
         LinearLayout header = new LinearLayout(this);
         header.setGravity(Gravity.CENTER_VERTICAL);
@@ -972,7 +999,7 @@ public class MainActivity extends Activity {
         LinearLayout page = new LinearLayout(this);
         page.setOrientation(LinearLayout.VERTICAL);
         page.setFitsSystemWindows(true);
-        page.setBackgroundColor(Color.rgb(9, 17, 37));
+        page.setBackgroundColor(DREAM_BG);
         setContentView(page);
         LinearLayout header = new LinearLayout(this);
         header.setGravity(Gravity.CENTER_VERTICAL);
@@ -1556,7 +1583,7 @@ public class MainActivity extends Activity {
         LinearLayout page = new LinearLayout(this);
         page.setOrientation(LinearLayout.VERTICAL);
         page.setFitsSystemWindows(true);
-        page.setBackgroundColor(Color.rgb(9, 17, 37));
+        page.setBackgroundColor(DREAM_BG);
         setContentView(page);
         LinearLayout header = new LinearLayout(this);
         header.setGravity(Gravity.CENTER_VERTICAL);
@@ -1817,7 +1844,7 @@ public class MainActivity extends Activity {
         LinearLayout page = new LinearLayout(this);
         page.setOrientation(LinearLayout.VERTICAL);
         page.setFitsSystemWindows(true);
-        page.setBackgroundColor(Color.rgb(9, 17, 37));
+        page.setBackgroundColor(DREAM_BG);
         setContentView(page);
         LinearLayout header = new LinearLayout(this);
         header.setGravity(Gravity.CENTER_VERTICAL);
@@ -1924,7 +1951,7 @@ public class MainActivity extends Activity {
         LinearLayout page = new LinearLayout(this);
         page.setOrientation(LinearLayout.VERTICAL);
         page.setFitsSystemWindows(true);
-        page.setBackgroundColor(Color.rgb(9, 17, 37));
+        page.setBackgroundColor(DREAM_BG);
         setContentView(page);
         LinearLayout header = new LinearLayout(this);
         header.setGravity(Gravity.CENTER_VERTICAL);
@@ -2250,7 +2277,7 @@ public class MainActivity extends Activity {
         LinearLayout page = new LinearLayout(this);
         page.setOrientation(LinearLayout.VERTICAL);
         page.setPadding(dp(20), dp(18), dp(20), dp(12));
-        page.setBackgroundColor(Color.rgb(9, 17, 37));
+        page.setBackgroundColor(DREAM_BG);
         android.widget.FrameLayout scene = new android.widget.FrameLayout(this);
         scene.setBackgroundColor(Color.rgb(9, 17, 37));
         scene.setFitsSystemWindows(true);
@@ -2565,7 +2592,7 @@ public class MainActivity extends Activity {
         page.setOrientation(LinearLayout.VERTICAL);
         page.setFitsSystemWindows(true);
         page.setPadding(dp(16), dp(8), dp(16), dp(8));
-        page.setBackgroundColor(Color.rgb(9, 17, 37));
+        page.setBackgroundColor(DREAM_BG);
         android.widget.FrameLayout scene = new android.widget.FrameLayout(this);
         ImageView backdrop = new ImageView(this);
         backdrop.setScaleType(ImageView.ScaleType.CENTER_CROP);
