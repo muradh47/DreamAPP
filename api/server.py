@@ -1,98 +1,164 @@
-"""Dream UK football listings adapter.
-
-Run: pip install -r api/requirements.txt && uvicorn api.server:app --host 0.0.0.0 --port 8000
-Source: LiveOnSat public UK listings. Respect source permissions and request limits.
-"""
+"""Dream Football API: fixtures, optional broadcaster listings, IPTV channel matching."""
+import os
 import re
 import time
 from datetime import datetime, timezone
 from difflib import SequenceMatcher
-from functools import lru_cache
-from urllib.parse import urljoin
 
 import requests
 from bs4 import BeautifulSoup
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel, Field
 
-app = FastAPI(title="Dream Football Listings", version="0.1.0")
-SOURCE = "https://www.liveonsat.com/uk-england-all-football.php"
+app = FastAPI(title="Dream Football API", version="0.2.0")
+SPORTSDB = "https://www.thesportsdb.com/api/v1/json/123/eventsnextleague.php?id="
+LEAGUES = {"4328": "Premier League", "4329": "Championship",
+           "4330": "League One", "4331": "League Two"}
 CACHE_SECONDS = 1800
-_cached = {"at": 0, "matches": []}
-HEADERS = {"User-Agent": "DreamFootballListings/0.1 (+contact site owner for data permission)"}
+_cache = {"at": 0.0, "fixtures": []}
+SESSION = requests.Session()
+SESSION.headers.update({"User-Agent": "DreamFootballAPI/0.2"})
+# A licensed, JSON-compatible broadcast feed may be configured later.
+BROADCAST_FEED_URL = os.getenv("DREAM_BROADCAST_FEED_URL", "")
 
 
-def normalise(value):
-    value = re.sub(r"\\b(fc|afc|football club|hd|uhd|4k|uk|tv)\\b", " ", value.lower())
-    return re.sub(r"[^a-z0-9]+", " ", value).strip()
+class Channel(BaseModel):
+    stream_id: str | int
+    name: str
+    category_name: str = ""
 
 
-def channel_matches(listing, channels):
-    """Return IPTV channels matching a broadcaster or a fixture's team-named hub."""
-    names = [listing.get("home", ""), listing.get("away", "")]
-    broadcasters = [normalise(x) for x in listing.get("broadcasters", [])]
-    matched = []
+class Fixture(BaseModel):
+    id: str = ""
+    home: str
+    away: str
+    kickoff_utc: str = ""
+    league: str = ""
+    broadcasters: list[str] = Field(default_factory=list)
+
+
+class MatchRequest(BaseModel):
+    fixture: Fixture
+    channels: list[Channel] = Field(max_length=30000)
+
+
+ALIASES = {
+    "man utd": "manchester united", "man united": "manchester united",
+    "man city": "manchester city", "spurs": "tottenham",
+    "wolves": "wolverhampton", "brighton hove albion": "brighton",
+    "nottm forest": "nottingham forest", "west brom": "west bromwich albion",
+    "qpr": "queens park rangers", "sheff utd": "sheffield united",
+    "sheff wed": "sheffield wednesday", "boro": "middlesbrough",
+}
+
+
+def normalise(value: str) -> str:
+    value = re.sub(r"[^a-z0-9]+", " ", value.lower())
+    value = re.sub(r"\\b(fc|afc|football club|hd|uhd|4k|uk|tv)\\b", " ", value)
+    value = " ".join(value.split())
+    return ALIASES.get(value, value)
+
+
+def token_match(team: str, channel: str) -> bool:
+    team = normalise(team)
+    channel = normalise(channel)
+    if len(team) < 4:
+        return False
+    return bool(re.search(r"(?<![a-z0-9])" + re.escape(team) + r"(?![a-z0-9])", channel))
+
+
+def channel_matches(fixture: dict, channels: list[dict]) -> list[dict]:
+    broadcaster_names = [normalise(x) for x in fixture.get("broadcasters", [])]
+    output = []
+    seen = set()
     for channel in channels:
-        name = normalise(channel.get("name", ""))
-        if not name:
+        name = channel.get("name", "")
+        stream_id = str(channel.get("stream_id", ""))
+        if not name or not stream_id or stream_id in seen:
             continue
-        broadcast = any(b and (b in name or name in b) and min(len(b), len(name)) >= 5 for b in broadcasters)
-        team = any(normalise(t) in name and len(normalise(t)) >= 5 for t in names)
-        if broadcast or team:
-            matched.append({**channel, "match_type": "broadcaster" if broadcast else "team_stream",
-                            "confirmed_live": False})
-    return matched
+        norm = normalise(name)
+        broadcaster = any(len(b) >= 5 and
+                          (token_match(b, norm) or token_match(norm, b))
+                          for b in broadcaster_names)
+        team = any(token_match(fixture.get(side, ""), name) for side in ("home", "away"))
+        if not broadcaster and not team:
+            continue
+        seen.add(stream_id)
+        output.append({**channel,
+                       "match_type": "broadcaster" if broadcaster else "team_stream",
+                       "confirmed_live": False})
+    return sorted(output, key=lambda item: (item["match_type"] != "broadcaster", item["name"]))
 
 
-def parse_liveonsat(html):
-    """Best-effort parser; upstream markup may change. Never invent channels."""
-    soup = BeautifulSoup(html, "html.parser")
-    results = []
-    # LiveOnSat event titles appear in fixture rows, with broadcaster lines following.
-    # Restrict extraction to event containers to avoid assigning broadcasters across fixtures.
-    for node in soup.select(".match, .fixture, .event, .block, .div_event"):
-        text = node.get_text(" ", strip=True)
-        matchup = re.search(r"([A-Za-z][A-Za-z .&'’-]{2,55})\\s+v(?:s|ersus)?\\.?\\s+([A-Za-z][A-Za-z .&'’-]{2,55})", text)
-        if not matchup:
+def load_fixtures() -> list[dict]:
+    if time.monotonic() - _cache["at"] < CACHE_SECONDS:
+        return _cache["fixtures"]
+    fixtures = []
+    for league_id, league in LEAGUES.items():
+        try:
+            response = SESSION.get(SPORTSDB + league_id, timeout=12)
+            response.raise_for_status()
+            for event in response.json().get("events") or []:
+                if not event.get("strHomeTeam") or not event.get("strAwayTeam"):
+                    continue
+                fixtures.append({
+                    "id": str(event.get("idEvent", "")),
+                    "home": event["strHomeTeam"],
+                    "away": event["strAwayTeam"],
+                    "kickoff_utc": ((event.get("dateEvent") or "") + "T" +
+                                    (event.get("strTime") or "00:00:00") + "Z"),
+                    "league": league,
+                    "broadcasters": [],
+                })
+        except (requests.RequestException, ValueError, KeyError):
             continue
-        home, away = (x.strip() for x in matchup.groups())
-        broadcasters = []
-        for el in node.select("a, li, .channel, .broadcaster"):
-            name = el.get_text(" ", strip=True)
-            if name and name not in (home, away) and 3 <= len(name) <= 85:
-                broadcasters.append(name)
-        results.append({"home": home, "away": away,
-                        "broadcasters": list(dict.fromkeys(broadcasters)),
-                        "source": SOURCE, "kickoff": None})
-    return results
+    if not fixtures and not _cache["fixtures"]:
+        raise HTTPException(503, "Fixture provider unavailable")
+    if fixtures:
+        fixtures.sort(key=lambda item: item["kickoff_utc"])
+        _cache.update(at=time.monotonic(), fixtures=fixtures)
+    return _cache["fixtures"]
 
 
 @app.get("/health")
 def health():
-    return {"ok": True, "source": SOURCE, "cached_matches": len(_cached["matches"])}
+    return {"ok": True, "version": "0.2.0",
+            "fixture_cache_count": len(_cache["fixtures"]),
+            "broadcast_feed_configured": bool(BROADCAST_FEED_URL)}
+
+
+@app.get("/api/football/fixtures")
+def fixtures():
+    return {"fixtures": load_fixtures(), "source": "TheSportsDB",
+            "broadcast_status": "not_configured" if not BROADCAST_FEED_URL else "configured"}
 
 
 @app.get("/api/football/listings")
 def listings():
-    if time.monotonic() - _cached["at"] < CACHE_SECONDS:
-        return {"matches": _cached["matches"], "source": SOURCE, "cached": True}
+    """Compatibility endpoint. Broadcast listings require an authorised JSON feed."""
+    data = load_fixtures()
+    if not BROADCAST_FEED_URL:
+        return {"matches": data, "source": "TheSportsDB",
+                "broadcast_status": "not_configured"}
     try:
-        response = requests.get(SOURCE, headers=HEADERS, timeout=15)
+        response = SESSION.get(BROADCAST_FEED_URL, timeout=12)
         response.raise_for_status()
-        matches = parse_liveonsat(response.text)
-    except requests.RequestException as exc:
-        if _cached["at"]:
-            return {"matches": _cached["matches"], "source": SOURCE, "stale": True}
-        raise HTTPException(503, "LiveOnSat listing source unavailable") from exc
-    _cached.update(at=time.monotonic(), matches=matches)
-    return {"matches": matches, "source": SOURCE, "cached": False,
-            "warning": "Source markup may change; verify listings before relying on them."}
+        broadcast_data = response.json()
+        mapping = {str(row["id"]): row.get("broadcasters", [])
+                   for row in broadcast_data.get("matches", []) if row.get("id")}
+    except (requests.RequestException, ValueError, KeyError, TypeError):
+        return {"matches": data, "source": "TheSportsDB",
+                "broadcast_status": "unavailable"}
+    return {"matches": [{**fixture,
+                         "broadcasters": mapping.get(fixture["id"], [])}
+                        for fixture in data],
+            "source": "TheSportsDB + configured broadcast feed",
+            "broadcast_status": "available"}
 
 
 @app.post("/api/football/match-channels")
-def match_channels(payload: dict):
-    fixture = payload.get("fixture", {})
-    channels = payload.get("channels", [])
-    if not isinstance(channels, list) or len(channels) > 30000:
-        raise HTTPException(400, "Invalid channels list")
+def match_channels(payload: MatchRequest):
+    fixture = payload.fixture.model_dump()
+    channels = [channel.model_dump() for channel in payload.channels]
     return {"channels": channel_matches(fixture, channels),
-            "note": "Broadcaster and team-name matches are suggestions, not confirmed streams."}
+            "note": "Channel name matches are suggestions; live carriage is unverified."}
