@@ -1759,23 +1759,10 @@ public class MainActivity extends Activity {
         label.setMaxLines(2);
         label.setEllipsize(android.text.TextUtils.TruncateAt.END);
         label.setGravity(Gravity.CENTER);
-        card.addView(label, new LinearLayout.LayoutParams(-1, dp(56)));
-        if (!type.equals("live")) {
-            String rating = metadata.optString("rating_5based", metadata.optString("rating", ""));
-            String year = metadata.optString("releaseDate", metadata.optString("release_date", ""));
-            String imdb = metadata.optString("imdb_id", "");
-            String details = (year.length() >= 4 ? year.substring(0, 4) : "") +
-                (!rating.isEmpty() ? "  ★ " + rating : "") +
-                (!imdb.isEmpty() ? "  IMDb" : "");
-            if (!details.trim().isEmpty()) {
-                TextView info = text(details.trim());
-                info.setTextSize(11);
-                info.setTextColor(Color.LTGRAY);
-                info.setGravity(Gravity.CENTER);
-                info.setSingleLine(true);
-                card.addView(info, new LinearLayout.LayoutParams(-1, dp(18)));
-            }
-        }
+        label.setIncludeFontPadding(false);
+        label.setPadding(dp(8), dp(6), dp(8), dp(6));
+        card.addView(label, new LinearLayout.LayoutParams(-1, dp(72)));
+
         GridLayout.LayoutParams gp = new GridLayout.LayoutParams();
         boolean seriesWall = type.equals("series") && categorySidebar != null && categorySidebar.getParent() != null;
         boolean movieWall = type.equals("vod") && categorySidebar != null && categorySidebar.getParent() != null;
@@ -1784,7 +1771,7 @@ public class MainActivity extends Activity {
             - dp(26);
         int cols = contentGrid.getColumnCount();
         gp.width = seriesWall || movieWall ? Math.max(dp(130), availableWidth / cols - dp(12)) : dp(155);
-        gp.height = seriesWall || movieWall ? dp(334) : dp(170);
+        gp.height = seriesWall || movieWall ? dp(322) : dp(170);
         gp.setMargins(dp(6), dp(6), dp(6), dp(6));
         contentGrid.addView(card, gp);
 
