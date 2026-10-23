@@ -319,49 +319,117 @@ public class MainActivity extends Activity {
         releasePlayer();
         setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
         getWindow().getDecorView().setSystemUiVisibility(0);
-        screen("DREAM IPTV");
-        boolean compact = getResources().getDisplayMetrics().widthPixels < dp(700);
-        root.setPadding(dp(compact ? 12 : 22), dp(10), dp(compact ? 12 : 22), dp(18));
-        root.setGravity(Gravity.CENTER_VERTICAL);
-        root.setBackground(new GradientDrawable(GradientDrawable.Orientation.TL_BR,
-            new int[]{Color.rgb(4, 34, 79), Color.rgb(5, 19, 46), Color.rgb(2, 11, 30)}));
-        TextView oldHeading = (TextView) root.getChildAt(0);
-        root.removeView(oldHeading);
-
-        LinearLayout topBar = row();
-        TextView brand = text("▶ DREAM IPTV");
-        brand.setTextSize(24);
-        brand.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
-        brand.setTextColor(Color.WHITE);
-        topBar.addView(brand, new LinearLayout.LayoutParams(0, dp(56), 1));
-        Button search = homeTile(compact ? "⌕" : "⌕  SEARCH", Color.rgb(12, 37, 72), this::showSearch);
-        search.setTextSize(14);
-        topBar.addView(search, new LinearLayout.LayoutParams(dp(compact ? 52 : 125), dp(48)));
-        Button settings = homeTile(compact ? "⚙" : "⚙  SETTINGS", Color.rgb(12, 37, 72), this::showHomeSettings);
-        settings.setTextSize(14);
-        topBar.addView(settings, new LinearLayout.LayoutParams(dp(compact ? 52 : 140), dp(48)));
-
-        LinearLayout primary = row();
-        if (compact) primary.setOrientation(LinearLayout.VERTICAL);
-        Button live = homeTile("📺\nLIVE TV",
-            Color.rgb(0, 88, 213), () -> showLiveDashboard());
-        addHomeTile(primary, live, compact ? 126 : 196);
-        addHomeTile(primary, homeTile("🎬\nMOVIES",
-            Color.rgb(219, 32, 45), this::showMovieDashboard), compact ? 126 : 196);
-        addHomeTile(primary, homeTile("🎭\nSERIES",
-            Color.rgb(98, 14, 180), this::showSeriesDashboard), compact ? 126 : 196);
-
-        LinearLayout shortcuts = row();
-        if (compact) shortcuts.setOrientation(LinearLayout.VERTICAL);
-        addHomeTile(shortcuts, homeTile("◷  CATCH UP", Color.rgb(10, 46, 84),
-            () -> showCategories("live")), compact ? 64 : 88);
-        addHomeTile(shortcuts, homeTile("▦  TV GUIDE", Color.rgb(10, 46, 84),
-            this::showGuide), 88);
-        addHomeTile(shortcuts, homeTile("♥  FAVOURITES", Color.rgb(10, 46, 84),
-            () -> showCategories("live")), 88);
-        addHomeTile(shortcuts, homeTile("⚙  SETTINGS", Color.rgb(10, 46, 84),
-            this::showHomeSettings), 88);
+        boolean compact = getResources().getDisplayMetrics().widthPixels < dp(650);
+        LinearLayout page = new LinearLayout(this);
+        page.setOrientation(LinearLayout.VERTICAL);
+        page.setFitsSystemWindows(true);
+        page.setBackground(new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+            new int[]{Color.rgb(13, 27, 49), Color.rgb(6, 14, 29), Color.rgb(5, 12, 25)}));
+        setContentView(page);
+        LinearLayout navigation = new LinearLayout(this);
+        navigation.setGravity(Gravity.CENTER_VERTICAL);
+        navigation.setPadding(dp(22), dp(8), dp(22), dp(8));
+        page.addView(navigation, new LinearLayout.LayoutParams(-1, dp(76)));
+        TextView logo = text("DREAM");
+        logo.setTextSize(29);
+        logo.setTypeface(Typeface.DEFAULT_BOLD);
+        logo.setTextColor(Color.rgb(88, 176, 255));
+        navigation.addView(logo, new LinearLayout.LayoutParams(0, -2, 1));
+        Button search = tile("⌕", Color.rgb(24, 40, 65), this::showSearch);
+        search.setTextSize(23);
+        navigation.addView(search, new LinearLayout.LayoutParams(dp(52), dp(46)));
+        Button settings = tile("⚙", Color.rgb(24, 40, 65), this::showHomeSettings);
+        settings.setTextSize(21);
+        LinearLayout.LayoutParams settingsParams = new LinearLayout.LayoutParams(dp(52), dp(46));
+        settingsParams.setMargins(dp(10), 0, 0, 0);
+        navigation.addView(settings, settingsParams);
+        ScrollView scroll = new ScrollView(this);
+        scroll.setFillViewport(true);
+        page.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setPadding(dp(22), dp(8), dp(22), dp(28));
+        scroll.addView(content);
+        LinearLayout hero = new LinearLayout(this);
+        hero.setOrientation(LinearLayout.VERTICAL);
+        hero.setGravity(Gravity.CENTER_VERTICAL);
+        hero.setPadding(dp(26), dp(22), dp(26), dp(22));
+        GradientDrawable heroBg = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+            new int[]{Color.rgb(20, 76, 139), Color.rgb(17, 43, 79), Color.rgb(11, 24, 47)});
+        heroBg.setCornerRadius(dp(20));
+        heroBg.setStroke(dp(1), Color.rgb(51, 96, 147));
+        hero.setBackground(heroBg);
+        content.addView(hero, new LinearLayout.LayoutParams(-1, dp(compact ? 190 : 215)));
+        TextView eyebrow = text("YOUR ENTERTAINMENT, ALL IN ONE PLACE");
+        eyebrow.setTextSize(12);
+        eyebrow.setTextColor(Color.rgb(166, 215, 255));
+        hero.addView(eyebrow);
+        TextView headline = text("Welcome to Dream");
+        headline.setTextSize(compact ? 28 : 36);
+        headline.setTypeface(Typeface.DEFAULT_BOLD);
+        headline.setPadding(0, dp(9), 0, dp(7));
+        hero.addView(headline);
+        TextView subheading = text("Live television, films and series. Ready when you are.");
+        subheading.setTextSize(15);
+        subheading.setTextColor(Color.rgb(205, 221, 239));
+        hero.addView(subheading);
+        TextView browseHeading = text("EXPLORE");
+        browseHeading.setTextSize(17);
+        browseHeading.setTypeface(Typeface.DEFAULT_BOLD);
+        browseHeading.setPadding(dp(4), dp(20), 0, dp(8));
+        content.addView(browseHeading);
+        LinearLayout primary = new LinearLayout(this);
+        primary.setOrientation(compact ? LinearLayout.VERTICAL : LinearLayout.HORIZONTAL);
+        content.addView(primary);
+        Button live = dreamHomeCard("▣", "LIVE TV", "Channels & live sports",
+            Color.rgb(25, 96, 171), this::showLiveDashboard);
+        addDreamHomeCard(primary, live, compact);
+        addDreamHomeCard(primary, dreamHomeCard("▤", "MOVIES", "Discover your next film",
+            Color.rgb(32, 54, 87), this::showMovieDashboard), compact);
+        addDreamHomeCard(primary, dreamHomeCard("▦", "SERIES", "Shows, seasons & episodes",
+            Color.rgb(32, 54, 87), this::showSeriesDashboard), compact);
+        TextView quickHeading = text("QUICK ACCESS");
+        quickHeading.setTextSize(17);
+        quickHeading.setTypeface(Typeface.DEFAULT_BOLD);
+        quickHeading.setPadding(dp(4), dp(20), 0, dp(8));
+        content.addView(quickHeading);
+        LinearLayout quick = new LinearLayout(this);
+        quick.setOrientation(compact ? LinearLayout.VERTICAL : LinearLayout.HORIZONTAL);
+        content.addView(quick);
+        addDreamHomeCard(quick, dreamHomeCard("▥", "TV GUIDE", "What's on now & next",
+            Color.rgb(24, 40, 65), this::showGuide), compact);
+        addDreamHomeCard(quick, dreamHomeCard("♡", "FAVOURITES", "Your saved channels",
+            Color.rgb(24, 40, 65), () -> showCategories("live")), compact);
+        addDreamHomeCard(quick, dreamHomeCard("⚙", "SETTINGS", "Manage Dream",
+            Color.rgb(24, 40, 65), this::showHomeSettings), compact);
         live.requestFocus();
+    }
+
+    private Button dreamHomeCard(String symbol, String title, String subtitle, int color, Runnable action) {
+        Button button = tile(symbol + "   " + title + "\n" + subtitle, color, action);
+        button.setTextSize(17);
+        button.setGravity(Gravity.CENTER_VERTICAL | Gravity.LEFT);
+        button.setPadding(dp(22), dp(12), dp(12), dp(12));
+        button.setLineSpacing(dp(6), 1f);
+        button.setOnFocusChangeListener((view, focused) -> {
+            GradientDrawable bg = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                new int[]{focused ? Color.rgb(29, 113, 207) : color,
+                    focused ? Color.rgb(20, 70, 140) : darken(color)});
+            bg.setCornerRadius(dp(16));
+            bg.setStroke(dp(focused ? 2 : 1),
+                focused ? Color.rgb(130, 210, 255) : Color.rgb(47, 70, 102));
+            button.setBackground(bg);
+            button.setScaleX(focused ? 1.015f : 1f);
+            button.setScaleY(focused ? 1.015f : 1f);
+        });
+        return button;
+    }
+
+    private void addDreamHomeCard(LinearLayout parent, Button button, boolean compact) {
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+            compact ? -1 : 0, dp(compact ? 92 : 140), compact ? 0 : 1);
+        params.setMargins(dp(5), dp(5), dp(5), dp(5));
+        parent.addView(button, params);
     }
 
     private void showSearch() {
@@ -430,7 +498,7 @@ public class MainActivity extends Activity {
         page.addView(header, new LinearLayout.LayoutParams(-1, dp(60)));
         Button back = tile("‹ HOME", Color.rgb(25, 42, 75), this::showHome);
         header.addView(back, new LinearLayout.LayoutParams(dp(105), dp(46)));
-        TextView heading = text("DREAM IPTV  /  TV GUIDE");
+        TextView heading = text("DREAM  /  TV GUIDE");
         heading.setTextSize(21);
         heading.setTypeface(Typeface.DEFAULT_BOLD);
         header.addView(heading, new LinearLayout.LayoutParams(0, -2, 1));
@@ -1014,7 +1082,7 @@ public class MainActivity extends Activity {
         page.addView(header, new LinearLayout.LayoutParams(-1, dp(56)));
         Button home = tile("‹ HOME", Color.rgb(25, 42, 75), this::showHome);
         header.addView(home, new LinearLayout.LayoutParams(dp(86), dp(42)));
-        TextView brand = text("  DREAM IPTV  /  LIVE");
+        TextView brand = text("  DREAM  /  LIVE");
         brand.setTextSize(18);
         brand.setTypeface(Typeface.DEFAULT_BOLD);
         header.addView(brand, new LinearLayout.LayoutParams(0, -2, 1));
@@ -1276,7 +1344,7 @@ public class MainActivity extends Activity {
         Button home = tile("‹ HOME", Color.rgb(25, 42, 75), this::showHome);
         home.setTextSize(14);
         header.addView(home, new LinearLayout.LayoutParams(dp(90), dp(44)));
-        TextView title = text("  DREAM IPTV  /  MOVIES");
+        TextView title = text("  DREAM  /  MOVIES");
         title.setTypeface(Typeface.DEFAULT_BOLD);
         title.setTextSize(19);
         header.addView(title, new LinearLayout.LayoutParams(0, -2, 1));
@@ -1383,7 +1451,7 @@ public class MainActivity extends Activity {
         Button home = tile("‹ HOME", Color.rgb(25, 42, 75), this::showHome);
         home.setTextSize(14);
         header.addView(home, new LinearLayout.LayoutParams(dp(90), dp(44)));
-        TextView title = text("  DREAM IPTV  /  SERIES");
+        TextView title = text("  DREAM  /  SERIES");
         title.setTypeface(Typeface.DEFAULT_BOLD);
         title.setTextSize(19);
         header.addView(title, new LinearLayout.LayoutParams(0, -2, 1));
