@@ -1145,7 +1145,7 @@ public class MainActivity extends Activity {
         body.setOrientation(LinearLayout.HORIZONTAL);
         page.addView(body, new LinearLayout.LayoutParams(-1, 0, 1));
         int width = getResources().getDisplayMetrics().widthPixels;
-        int sideWidth = Math.min(dp(255), Math.max(dp(150), width / 4));
+        int sideWidth = Math.min(dp(190), Math.max(dp(128), width / 6));
         ScrollView sidebarScroll = new ScrollView(this);
         sidebarScroll.setBackgroundColor(Color.rgb(15, 29, 58));
         body.addView(sidebarScroll, new LinearLayout.LayoutParams(sideWidth, -1));
@@ -1750,17 +1750,16 @@ public class MainActivity extends Activity {
             focused ? Color.rgb(33, 107, 187) : Color.rgb(29, 36, 52)));
         ImageView image = new ImageView(this);
         image.setImageResource(android.R.drawable.ic_menu_gallery);
-        image.setScaleType(type.equals("series") ? ImageView.ScaleType.CENTER_CROP : ImageView.ScaleType.FIT_CENTER);
-        image.setPadding(type.equals("series") ? 0 : dp(8), type.equals("series") ? 0 : dp(8),
-            type.equals("series") ? 0 : dp(8), type.equals("series") ? 0 : dp(8));
-        card.addView(image, new LinearLayout.LayoutParams(-1, moviePosterHeight(type)));
+        image.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        image.setPadding(0, 0, 0, 0);
+        card.addView(image, new LinearLayout.LayoutParams(-1, dp(250)));
         loadArtwork(logo, image);
         TextView label = text(name);
-        label.setTextSize(type.equals("series") ? 16 : 14);
+        label.setTextSize(15);
         label.setMaxLines(2);
         label.setEllipsize(android.text.TextUtils.TruncateAt.END);
         label.setGravity(Gravity.CENTER);
-        card.addView(label, new LinearLayout.LayoutParams(-1, dp(45)));
+        card.addView(label, new LinearLayout.LayoutParams(-1, dp(56)));
         if (!type.equals("live")) {
             String rating = metadata.optString("rating_5based", metadata.optString("rating", ""));
             String year = metadata.optString("releaseDate", metadata.optString("release_date", ""));
@@ -1781,12 +1780,11 @@ public class MainActivity extends Activity {
         boolean seriesWall = type.equals("series") && categorySidebar != null && categorySidebar.getParent() != null;
         boolean movieWall = type.equals("vod") && categorySidebar != null && categorySidebar.getParent() != null;
         int availableWidth = getResources().getDisplayMetrics().widthPixels
-            - (seriesWall ? Math.min(dp(190), Math.max(dp(128), getResources().getDisplayMetrics().widthPixels / 6)) : movieWall ? Math.min(dp(255), Math.max(dp(150), getResources().getDisplayMetrics().widthPixels / 4)) : dp(16))
+            - (seriesWall ? Math.min(dp(190), Math.max(dp(128), getResources().getDisplayMetrics().widthPixels / 6)) : movieWall ? Math.min(dp(190), Math.max(dp(128), getResources().getDisplayMetrics().widthPixels / 6)) : dp(16))
             - dp(26);
         int cols = contentGrid.getColumnCount();
-        gp.width = seriesWall ? Math.max(dp(140), availableWidth / cols - dp(12)) :
-            movieWall ? Math.max(dp(95), availableWidth / cols - dp(12)) : dp(155);
-        gp.height = seriesWall ? dp(330) : movieWall ? dp(214) : dp(170);
+        gp.width = seriesWall || movieWall ? Math.max(dp(130), availableWidth / cols - dp(12)) : dp(155);
+        gp.height = seriesWall || movieWall ? dp(334) : dp(170);
         gp.setMargins(dp(6), dp(6), dp(6), dp(6));
         contentGrid.addView(card, gp);
 
@@ -1954,17 +1952,20 @@ public class MainActivity extends Activity {
                         try { return Integer.compare(Integer.parseInt(x), Integer.parseInt(y)); }
                         catch (NumberFormatException e) { return x.compareTo(y); }
                     });
-                    for (String season : keys) {
+                    Button seasonSelector = tile("SEASON " + keys.get(0) + "   ▾  SELECT SEASON",
+                        Color.rgb(24, 113, 197), () -> {});
+                    episodesList.addView(seasonSelector, new LinearLayout.LayoutParams(-1, dp(54)));
+                    LinearLayout chosenEpisodes = new LinearLayout(this);
+                    chosenEpisodes.setOrientation(LinearLayout.VERTICAL);
+                    episodesList.addView(chosenEpisodes);
+                    Runnable[] displaySeason = new Runnable[1];
+                    final String[] selectedSeason = {keys.get(0)};
+                    displaySeason[0] = () -> {
+                        String season = selectedSeason[0];
                         JSONArray entries = episodes.optJSONArray(season);
-                        if (entries == null) continue;
-                        Button seasonButton = tile("SEASON " + season + "  (" + entries.length() + " episodes)  ▾",
-                            Color.rgb(25, 42, 75), () -> {});
-                        episodesList.addView(seasonButton, new LinearLayout.LayoutParams(-1, dp(48)));
-                        LinearLayout seasonItems = new LinearLayout(this);
-                        seasonItems.setOrientation(LinearLayout.VERTICAL);
-                        episodesList.addView(seasonItems);
-                        seasonButton.setOnClickListener(v -> seasonItems.setVisibility(
-                            seasonItems.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE));
+                        chosenEpisodes.removeAllViews();
+                        if (entries == null) return;
+                        seasonSelector.setText("SEASON " + season + "  •  " + entries.length() + " EPISODES   ▾");
                         for (int i = 0; i < entries.length(); i++) {
                             JSONObject episode = entries.optJSONObject(i);
                             if (episode == null) continue;
@@ -1973,15 +1974,52 @@ public class MainActivity extends Activity {
                             String title = episode.optString("title", "Episode " + (i + 1));
                             JSONObject episodeInfo = episode.optJSONObject("info");
                             String duration = episodeInfo == null ? "" : episodeInfo.optString("duration", "");
-                            Button episodeButton = tile("▶  " + title + (duration.isEmpty() ? "" : "  •  " + duration),
-                                Color.rgb(26, 39, 65), () -> play("series", episodeId, extension));
-                            episodeButton.setTextSize(14);
-                            episodeButton.setGravity(Gravity.CENTER_VERTICAL | Gravity.LEFT);
-                            LinearLayout.LayoutParams episodeParams = new LinearLayout.LayoutParams(-1, dp(54));
-                            episodeParams.setMargins(dp(10), dp(3), dp(10), dp(3));
-                            seasonItems.addView(episodeButton, episodeParams);
+                            LinearLayout episodeRow = new LinearLayout(this);
+                            episodeRow.setOrientation(LinearLayout.HORIZONTAL);
+                            episodeRow.setGravity(Gravity.CENTER_VERTICAL);
+                            episodeRow.setPadding(dp(16), dp(7), dp(14), dp(7));
+                            episodeRow.setBackgroundColor(Color.rgb(24, 35, 58));
+                            episodeRow.setFocusable(true);
+                            episodeRow.setClickable(true);
+                            episodeRow.setOnClickListener(v -> play("series", episodeId, extension));
+                            episodeRow.setOnFocusChangeListener((v, focused) ->
+                                episodeRow.setBackgroundColor(focused ? Color.rgb(24, 113, 197) : Color.rgb(24, 35, 58)));
+                            TextView number = text(String.format(java.util.Locale.ROOT, "%02d", i + 1));
+                            number.setTextSize(20);
+                            number.setTextColor(Color.rgb(154, 190, 230));
+                            episodeRow.addView(number, new LinearLayout.LayoutParams(dp(48), -2));
+                            LinearLayout episodeText = new LinearLayout(this);
+                            episodeText.setOrientation(LinearLayout.VERTICAL);
+                            TextView episodeTitle = text(title);
+                            episodeTitle.setTextSize(15);
+                            episodeTitle.setMaxLines(2);
+                            episodeText.addView(episodeTitle);
+                            if (!duration.isEmpty()) {
+                                TextView runtime = text(duration);
+                                runtime.setTextSize(12);
+                                runtime.setTextColor(Color.LTGRAY);
+                                episodeText.addView(runtime);
+                            }
+                            episodeRow.addView(episodeText, new LinearLayout.LayoutParams(0, -2, 1));
+                            TextView playIcon = text("▶");
+                            playIcon.setTextSize(22);
+                            episodeRow.addView(playIcon);
+                            LinearLayout.LayoutParams ep = new LinearLayout.LayoutParams(-1, dp(76));
+                            ep.setMargins(0, dp(4), 0, dp(4));
+                            chosenEpisodes.addView(episodeRow, ep);
                         }
-                    }
+                    };
+                    seasonSelector.setOnClickListener(v -> {
+                        String[] options = new String[keys.size()];
+                        for (int i = 0; i < keys.size(); i++) options[i] = "Season " + keys.get(i);
+                        new android.app.AlertDialog.Builder(this).setTitle("Choose a season")
+                            .setSingleChoiceItems(options, keys.indexOf(selectedSeason[0]), (dialog, index) -> {
+                                selectedSeason[0] = keys.get(index);
+                                displaySeason[0].run();
+                                dialog.dismiss();
+                            }).setNegativeButton("CANCEL", null).show();
+                    });
+                    displaySeason[0].run();
                 });
             } catch (Exception e) {
                 runOnUiThread(() -> {
