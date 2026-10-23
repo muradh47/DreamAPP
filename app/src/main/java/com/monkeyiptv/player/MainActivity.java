@@ -394,7 +394,7 @@ public class MainActivity extends Activity {
         center.addView(tiles, new LinearLayout.LayoutParams(-1, -2));
         boolean stacked = tiles.getOrientation() == LinearLayout.VERTICAL;
         dreamPrimaryTile(tiles, "▣", "LIVE TV", "Watch live channels",
-            Color.rgb(21, 94, 173), this::showLiveDashboard, stacked);
+            Color.rgb(21, 94, 173), () -> showCategories("live"), stacked);
         dreamPrimaryTile(tiles, "▤", "MOVIES", "Explore films",
             Color.rgb(23, 36, 58), this::showMovieDashboard, stacked);
         dreamPrimaryTile(tiles, "▦", "SERIES", "Browse your shows",
@@ -1569,6 +1569,8 @@ public class MainActivity extends Activity {
     private final java.util.Map<String, String> liveDashboardCardNames = new java.util.HashMap<>();
     private TextView liveDashboardPreviewBadge;
 
+    private String requestedLiveCategoryId = null;
+
     private void showLiveDashboard() {
         releasePlayer();
         currentType = "live";
@@ -1589,8 +1591,9 @@ public class MainActivity extends Activity {
         header.setGravity(Gravity.CENTER_VERTICAL);
         header.setPadding(dp(12), dp(5), dp(12), dp(5));
         page.addView(header, new LinearLayout.LayoutParams(-1, dp(56)));
-        Button home = tile("‹ HOME", Color.rgb(25, 42, 75), this::showHome);
-        header.addView(home, new LinearLayout.LayoutParams(dp(86), dp(42)));
+        Button home = tile("‹ CATEGORIES", Color.rgb(25, 42, 75), () -> showCategories("live"));
+        home.setTextSize(12);
+        header.addView(home, new LinearLayout.LayoutParams(dp(118), dp(42)));
         TextView brand = text("  DREAM  /  LIVE");
         brand.setTextSize(18);
         brand.setTypeface(Typeface.DEFAULT_BOLD);
@@ -1673,7 +1676,10 @@ public class MainActivity extends Activity {
         liveDashboardChannels.setPadding(dp(2), dp(2), dp(2), dp(8));
         channelScroll.addView(liveDashboardChannels);
         populateLiveDashboardCategories(categoryCache.get("live"));
-        selectLiveDashboardDefault(categoryCache.get("live"));
+        if (requestedLiveCategoryId != null) {
+            selectLiveDashboardCategory(requestedLiveCategoryId, "SELECTED CATEGORY");
+            requestedLiveCategoryId = null;
+        } else selectLiveDashboardDefault(categoryCache.get("live"));
         if (categoryCache.get("live") == null) new Thread(() -> {
             try {
                 JSONArray cats = new JSONArray(fetch(api(username, password, "get_live_categories")));
@@ -2079,11 +2085,11 @@ public class MainActivity extends Activity {
             type.equals("vod") ? "MOVIES  •  CATEGORIES" : "SERIES  •  CATEGORIES");
         Button home = button("‹  HOME", this::showHome);
         home.setTextSize(14);
-        TextView hint = text("Choose a category");
+        TextView hint = text(type.equals("live") ? "Choose a channel group to start watching" : "Choose a category");
         hint.setTextSize(15);
         root.addView(hint);
         GridLayout categoriesGrid = new GridLayout(this);
-        categoriesGrid.setColumnCount(2);
+        categoriesGrid.setColumnCount(getResources().getDisplayMetrics().widthPixels >= dp(760) ? 4 : 2);
         categoriesGrid.setUseDefaultMargins(false);
         root.addView(categoriesGrid, new LinearLayout.LayoutParams(-1, -2));
         JSONArray cached = categoryCache.get(type);
@@ -2135,18 +2141,25 @@ public class MainActivity extends Activity {
         item.setSingleLine(true);
         item.setEllipsize(android.text.TextUtils.TruncateAt.END);
         item.setOnFocusChangeListener((v, focused) -> {
-            item.setBackgroundColor(focused ? Color.rgb(39, 111, 190) : Color.rgb(27, 43, 74));
-            item.setTextColor(Color.WHITE);
+            item.setBackground(dreamTileBackground(Color.rgb(27, 43, 74), focused));
+            item.setScaleX(focused ? 1.02f : 1f);
+            item.setScaleY(focused ? 1.02f : 1f);
         });
         int width = getResources().getDisplayMetrics().widthPixels - dp(48);
         GridLayout.LayoutParams params = new GridLayout.LayoutParams();
-        params.width = Math.max(dp(130), width / 2 - dp(8));
-        params.height = dp(58);
+        int columns = getResources().getDisplayMetrics().widthPixels >= dp(760) ? 4 : 2;
+        params.width = Math.max(dp(130), width / columns - dp(12));
+        params.height = dp(72);
         params.setMargins(dp(4), dp(4), dp(4), dp(4));
         grid.addView(item, params);
     }
 
     private void openCategory(String type, String categoryId) {
+        if ("live".equals(type)) {
+            requestedLiveCategoryId = categoryId;
+            showLiveDashboard();
+            return;
+        }
         browserShell(type);
         String categoryName = "ALL";
         JSONArray categories = categoryCache.get(type);
