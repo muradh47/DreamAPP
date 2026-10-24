@@ -6,10 +6,25 @@ on:
   workflow_dispatch:
 permissions:
   contents: write
+  actions: write
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      - name: Remove old temporary APK artifacts
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Releases are kept. Only temporary Actions artifacts are removed.
+          gh api --paginate "repos/$GH_REPO/actions/artifacts?per_page=100" --jq '.artifacts[] | select(.name == "Dream-IPTV-APK" or .name == "Dream-IPTV-PR-Test-APK") | .id' |
+          while read -r artifact_id; do
+            [ -n "$artifact_id" ] || continue
+            gh api -X DELETE "repos/$GH_REPO/actions/artifacts/$artifact_id"
+          done
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
         with:
@@ -46,12 +61,14 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Dream-IPTV-APK
+          retention-days: 1
           path: app/build/outputs/apk/release/app-release.apk
       - name: Upload pull request APK
         if: github.event_name == 'pull_request'
         uses: actions/upload-artifact@v4
         with:
           name: Dream-IPTV-PR-Test-APK
+          retention-days: 1
           path: app/build/outputs/apk/debug/*.apk
       - name: Publish Dream IPTV update
         if: github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
